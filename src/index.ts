@@ -1,6 +1,15 @@
 import { filter, isNonNullish, map, toKebabCase, unique } from "remeda";
-import { Product, ShopifyApiProduct, ShopifyProduct, ShopifySingleProduct } from "./types";
-import { calculateDiscount, generateStoreSlug, genProductSlug } from "./utils/func";
+import {
+  Product,
+  ShopifyApiProduct,
+  ShopifyProduct,
+  ShopifySingleProduct,
+} from "./types";
+import {
+  calculateDiscount,
+  generateStoreSlug,
+  genProductSlug,
+} from "./utils/func";
 
 export class Store {
   private storeDomain: string;
@@ -16,35 +25,38 @@ export class Store {
     this.baseUrl = fetchUrl;
   }
 
-  private productsDto(
-    products: ShopifyProduct[],
-  ): Product[] | null {
+  private productsDto(products: ShopifyProduct[]): Product[] | null {
     const storeSlug = generateStoreSlug(this.storeDomain);
     const data: Product[] = [];
 
     const normalizeImageUrl = (url?: string | null): string => {
-      if (!url) return '';
-      let newUrl = url.split('?')[0];
-      if (newUrl.startsWith('//')) {
-        newUrl = 'https:' + newUrl;
+      if (!url) return "";
+      let newUrl = url.split("?")[0];
+      if (newUrl.startsWith("//")) {
+        newUrl = "https:" + newUrl;
       }
       return newUrl;
     };
 
     for (const product of products) {
-      if (!product.images || product.images.length === 0 || !product.images[0]?.src) continue; // Added more robust check
+      if (
+        !product.images ||
+        product.images.length === 0 ||
+        !product.images[0]?.src
+      )
+        continue; // Added more robust check
       // Safe price calculation with fallback to 0
       const priceArr = unique(
         product.variants.map((variant) => {
           try {
             const price = Math.floor(
-              Number.parseFloat(variant.price.toString()) * 100,
+              Number.parseFloat(variant.price.toString()) * 100
             );
             return Number.isFinite(price) ? price : 0;
           } catch {
             return 0;
           }
-        }),
+        })
       ).filter((price) => price > 0); // Filter out negative prices
 
       const priceMin = priceArr.length > 0 ? Math.min(...priceArr) : 0;
@@ -59,7 +71,7 @@ export class Store {
             try {
               const price = variant.compare_at_price
                 ? Math.floor(
-                    Number.parseFloat(variant.compare_at_price.toString()) * 100,
+                    Number.parseFloat(variant.compare_at_price.toString()) * 100
                   )
                 : 0;
               return Number.isFinite(price) ? price : 0;
@@ -67,7 +79,7 @@ export class Store {
               return 0;
             }
           })
-          .filter((price) => price > 0), // Filter out negative prices
+          .filter((price) => price > 0) // Filter out negative prices
       );
 
       const compareAtPriceMin =
@@ -92,7 +104,7 @@ export class Store {
           key: toKebabCase(option.name),
           data: filter(
             map(option.values, (value) => value.toLowerCase()),
-            isNonNullish,
+            isNonNullish
           ),
         }));
       const p: Product = {
@@ -139,10 +151,10 @@ export class Store {
             : null;
 
           const variantPrice = Math.floor(
-            Number.parseFloat(variant.price.toString()) * 100,
+            Number.parseFloat(variant.price.toString()) * 100
           );
           const variantCompareAtPrice = Math.floor(
-            Number.parseFloat((variant.compare_at_price ?? 0).toString()) * 100,
+            Number.parseFloat((variant.compare_at_price ?? 0).toString()) * 100
           );
           return {
             id: `${variant.id}-by-${storeSlug}`,
@@ -162,7 +174,7 @@ export class Store {
             option3: variant.option3,
             options: filter(
               [variant.option1, variant.option2, variant.option3],
-              isNonNullish,
+              isNonNullish
             ),
             taxable: variant.taxable,
             barcode: null,
@@ -186,7 +198,8 @@ export class Store {
           width: image.width || 0,
           height: image.height || 0,
           alt: `${product.title} image ${index + 1}`,
-          mediaType: "image" as ShopifyApiProduct["images"][number]["mediaType"],
+          mediaType:
+            "image" as ShopifyApiProduct["images"][number]["mediaType"],
           aspectRatio: image.aspect_ratio,
         })),
         url: `${this.storeDomain}/products/${product.handle}`,
@@ -197,9 +210,7 @@ export class Store {
     return data;
   }
 
-  private productDto(
-    product: ShopifySingleProduct,
-  ): Product {
+  private productDto(product: ShopifySingleProduct): Product {
     const slug = genProductSlug({
       handle: product.handle,
       storeDomain: this.storeDomain,
@@ -207,10 +218,10 @@ export class Store {
     const storeSlug = generateStoreSlug(this.storeDomain);
 
     const normalizeImageUrl = (url?: string | null): string => {
-      if (!url) return '';
-      let newUrl = url.split('?')[0];
-      if (newUrl.startsWith('//')) {
-        newUrl = 'https:' + newUrl;
+      if (!url) return "";
+      let newUrl = url.split("?")[0];
+      if (newUrl.startsWith("//")) {
+        newUrl = "https:" + newUrl;
       }
       return newUrl;
     };
@@ -219,18 +230,31 @@ export class Store {
       ? Number.parseFloat(product.compare_at_price.toString())
       : 0;
 
-    let rawFeaturedImageUrlFromSource: string | undefined | null = product.featured_image;
+    let rawFeaturedImageUrlFromSource: string | undefined | null =
+      product.featured_image;
 
     // Fallback for featured image if product.featured_image is not available
-    if (!rawFeaturedImageUrlFromSource && product.images && product.images.length > 0 && typeof product.images[0] === 'string') {
+    if (
+      !rawFeaturedImageUrlFromSource &&
+      product.images &&
+      product.images.length > 0 &&
+      typeof product.images[0] === "string"
+    ) {
       rawFeaturedImageUrlFromSource = product.images[0];
     }
     // Further fallback to media if still not found
-    if (!rawFeaturedImageUrlFromSource && product.media && product.media.length > 0 && product.media[0]?.src) {
+    if (
+      !rawFeaturedImageUrlFromSource &&
+      product.media &&
+      product.media.length > 0 &&
+      product.media[0]?.src
+    ) {
       rawFeaturedImageUrlFromSource = product.media[0].src;
     }
 
-    const finalFeaturedImageUrl = normalizeImageUrl(rawFeaturedImageUrlFromSource);
+    const finalFeaturedImageUrl = normalizeImageUrl(
+      rawFeaturedImageUrlFromSource
+    );
 
     const medias = product.media?.map((media, index) => {
       const variantIds = product.variants
@@ -281,14 +305,14 @@ export class Store {
       priceMax: Number.parseFloat(product.price_max.toString()),
       compareAtPrice,
       compareAtPriceMin: Number.parseFloat(
-        product.compare_at_price_min.toString(),
+        product.compare_at_price_min.toString()
       ),
       compareAtPriceMax: Number.parseFloat(
-        product.compare_at_price_max.toString(),
+        product.compare_at_price_max.toString()
       ),
       discount: calculateDiscount(
         Number.parseFloat(product.price_min.toString()),
-        Number.parseFloat(compareAtPrice.toString()),
+        Number.parseFloat(compareAtPrice.toString())
       ),
       available: product.available,
       priceVaries: product.price_varies,
@@ -312,7 +336,9 @@ export class Store {
           : null;
 
         const variantPrice = Number.parseFloat(variant.price);
-        const variantCompareAtPrice = Number.parseFloat(variant.compare_at_price || "0");
+        const variantCompareAtPrice = Number.parseFloat(
+          variant.compare_at_price || "0"
+        );
         return {
           id: `${variant.id}-by-${storeSlug}`,
           platformId: variant.id.toString(),
@@ -331,7 +357,7 @@ export class Store {
           option3: variant.option3,
           options: filter(
             [variant.option1, variant.option2, variant.option3],
-            isNonNullish,
+            isNonNullish
           ),
           taxable: variant.taxable,
           barcode: variant.barcode || null,
@@ -352,7 +378,7 @@ export class Store {
           key: toKebabCase(option.name),
           data: filter(
             map(option.values, (value) => value.toLowerCase()),
-            isNonNullish,
+            isNonNullish
           ),
         })),
       featuredImage: finalFeaturedImageUrl, // CORRECTED: Use the normalized variable
@@ -403,7 +429,11 @@ export class Store {
           return productsData;
         } catch (error) {
           if (error instanceof Error) {
-            console.error(`Error fetching page ${page}:`, this.baseUrl, error.message);
+            console.error(
+              `Error fetching page ${page}:`,
+              this.baseUrl,
+              error.message
+            );
           }
           throw error;
         }
@@ -437,7 +467,10 @@ export class Store {
         throw error;
       }
     },
-    paginated: async (options?: { page?: number; limit?: number }): Promise<Product[] | null> => {
+    paginated: async (options?: {
+      page?: number;
+      limit?: number;
+    }): Promise<Product[] | null> => {
       const page = options?.page ?? 1;
       const limit = Math.min(options?.limit ?? 250, 250);
       const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
@@ -446,7 +479,7 @@ export class Store {
         const response = await fetch(url);
         if (!response.ok) {
           console.error(
-            `HTTP error! status: ${response.status} for ${this.storeDomain} page ${page}`,
+            `HTTP error! status: ${response.status} for ${this.storeDomain} page ${page}`
           );
           return null;
         }
@@ -461,7 +494,7 @@ export class Store {
       } catch (error) {
         console.error(
           `Error fetching products for ${this.storeDomain} page ${page} with limit ${limit}:`,
-          error,
+          error
         );
         return null;
       }
@@ -481,7 +514,11 @@ export class Store {
         return productData;
       } catch (error) {
         if (error instanceof Error) {
-          console.error(`Error fetching product ${productHandle}:`, this.baseUrl, error.message);
+          console.error(
+            `Error fetching product ${productHandle}:`,
+            this.baseUrl,
+            error.message
+          );
         }
         throw error;
       }
