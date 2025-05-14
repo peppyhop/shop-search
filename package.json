@@ -1,6 +1,6 @@
 {
 	"name": "shop-search",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
@@ -19,7 +19,9 @@
 		"dev": "tsup --watch",
 		"test": "jest"
 	},
-	"keywords": ["shop-search"],
+	"keywords": [
+		"shop-search"
+	],
 	"author": "tvayam.tech <<peppyhop@gmail.com>>",
 	"license": "ISC",
 	"description": "",
