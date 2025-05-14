@@ -22,8 +22,17 @@ export class Store {
     const storeSlug = generateStoreSlug(this.storeDomain);
     const data: Product[] = [];
 
+    const normalizeImageUrl = (url?: string | null): string => {
+      if (!url) return '';
+      let newUrl = url.split('?')[0];
+      if (newUrl.startsWith('//')) {
+        newUrl = 'https:' + newUrl;
+      }
+      return newUrl;
+    };
+
     for (const product of products) {
-      if (!product.images[0]) continue;
+      if (!product.images || product.images.length === 0 || !product.images[0]?.src) continue; // Added more robust check
       // Safe price calculation with fallback to 0
       const priceArr = unique(
         product.variants.map((variant) => {
@@ -73,6 +82,9 @@ export class Store {
         compareAtPrice > 0 && price > 0
           ? calculateDiscount(price, compareAtPrice)
           : 0;
+
+      const finalFeaturedImageUrl = normalizeImageUrl(product.images[0].src);
+
       const options = product.options
         .filter((option) => option.name.toLowerCase() !== "title")
         .map((option) => ({
@@ -103,8 +115,8 @@ export class Store {
         compareAtPriceMax: compareAtPriceMax,
         compareAtPriceVaries,
         discount,
-        featuredImage: product.images[0].src.split("?")[0],
-        isProxyFeaturedImage: true,
+        featuredImage: finalFeaturedImageUrl,
+        isProxyFeaturedImage: true, // This might need re-evaluation based on primary source
         publishedAt: new Date(product.published_at),
         vendor: product.vendor,
         productType: product.product_type,
@@ -170,7 +182,7 @@ export class Store {
           productId: image.product_id,
           position: image.position || 0,
           variantIds: image.variant_ids || [],
-          src: image.src,
+          src: normalizeImageUrl(image.src), // Normalize all image srcs
           width: image.width || 0,
           height: image.height || 0,
           alt: `${product.title} image ${index + 1}`,
@@ -194,9 +206,31 @@ export class Store {
     });
     const storeSlug = generateStoreSlug(this.storeDomain);
 
+    const normalizeImageUrl = (url?: string | null): string => {
+      if (!url) return '';
+      let newUrl = url.split('?')[0];
+      if (newUrl.startsWith('//')) {
+        newUrl = 'https:' + newUrl;
+      }
+      return newUrl;
+    };
+
     const compareAtPrice = product.compare_at_price
       ? Number.parseFloat(product.compare_at_price.toString())
       : 0;
+
+    let rawFeaturedImageUrlFromSource: string | undefined | null = product.featured_image;
+
+    // Fallback for featured image if product.featured_image is not available
+    if (!rawFeaturedImageUrlFromSource && product.images && product.images.length > 0 && typeof product.images[0] === 'string') {
+      rawFeaturedImageUrlFromSource = product.images[0];
+    }
+    // Further fallback to media if still not found
+    if (!rawFeaturedImageUrlFromSource && product.media && product.media.length > 0 && product.media[0]?.src) {
+      rawFeaturedImageUrlFromSource = product.media[0].src;
+    }
+
+    const finalFeaturedImageUrl = normalizeImageUrl(rawFeaturedImageUrlFromSource);
 
     const medias = product.media?.map((media, index) => {
       const variantIds = product.variants
@@ -208,7 +242,7 @@ export class Store {
         position: media.position,
         alt: media.alt || `${product.title} image ${index + 1}`,
         mediaType: media.media_type,
-        src: media.src,
+        src: normalizeImageUrl(media.src), // Normalize media src
         width: media.width,
         height: media.height,
         aspectRatio: media.aspect_ratio,
@@ -222,7 +256,7 @@ export class Store {
       productId: product.id,
       position: media.position,
       variantIds: media.variantIds,
-      src: media.src,
+      src: media.src, // Already normalized from medias mapping
       width: media.width,
       height: media.height,
       alt: media.alt,
@@ -321,9 +355,8 @@ export class Store {
             isNonNullish,
           ),
         })),
-      featuredImage:
-        product.featured_image || product.images[0] || product.media?.[0].src,
-      isProxyFeaturedImage: !product.featured_image,
+      featuredImage: finalFeaturedImageUrl, // CORRECTED: Use the normalized variable
+      isProxyFeaturedImage: !product.featured_image, // Review this logic
       images: !images
         ? product.images.map((imageSrc, index) => ({
             id: 0, // Single product format might not have image IDs
@@ -406,7 +439,7 @@ export class Store {
     },
     paginated: async (options?: { page?: number; limit?: number }): Promise<Product[] | null> => {
       const page = options?.page ?? 1;
-      const limit = options?.limit ?? 250;
+      const limit = Math.min(options?.limit ?? 250, 250);
       const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
 
       try {
