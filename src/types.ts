@@ -298,7 +298,6 @@ export type Product = {
   platformId: string | null;
   title: string;
   available: boolean;
-  // Use ProductPricing
   price: number;
   priceMin: number;
   priceVaries: boolean;
@@ -309,7 +308,6 @@ export type Product = {
   compareAtPriceVaries: boolean;
   discount: number;
   currency?: string;
-  // Use ProductOption
   options: ProductOption[];
   bodyHtml: string | null;
   active?: boolean;

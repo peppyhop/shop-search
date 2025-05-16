@@ -57,3 +57,96 @@ To fetch a specific product by its handle, use the `getProduct` method:
 ```typescript
 const product = await store.products.find("product-handle");
 ```
+
+### Response Type
+
+```ts
+type Product = {
+  slug: string;
+  handle: string;
+  platformId: string | null;
+  title: string;
+  available: boolean;
+  price: number;
+  priceMin: number;
+  priceVaries: boolean;
+  compareAtPrice: number;
+  compareAtPriceMin: number;
+  priceMax: number;
+  compareAtPriceMax: number;
+  compareAtPriceVaries: boolean;
+  discount: number;
+  currency?: string;
+  options: ProductOption[];
+  bodyHtml: string | null;
+  active?: boolean;
+  productType: string | null;
+  tags: string[];
+  vendor: string;
+  featuredImage?: string | null;
+  isProxyFeaturedImage: boolean | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  variants: ProductVariant[] | null;
+  images: ProductImage[];
+  publishedAt: Date | null;
+  seo?: MetaTag[] | null;
+  metaTags?: MetaTag[] | null;
+  displayScore?: number;
+  deletedAt?: Date | null;
+  storeSlug: string;
+  storeDomain: string;
+  embedding?: number[] | null;
+  url: string;
+  requiresSellingPlan?: boolean | null;
+  sellingPlanGroups?: unknown;
+};
+
+type ProductOption = {
+  key: string;
+  data: string[];
+  name: string;
+  position: number;
+  values: string[];
+};
+
+type ProductVariant = {
+  id: string;
+  platformId?: string | undefined;
+  name?: string | undefined;
+  title: string;
+  option1: string | null;
+  option2: string | null;
+  option3: string | null;
+  options?: string[] | undefined;
+  sku: string | null;
+  requiresShipping: boolean;
+  taxable: boolean;
+  featuredImage: ProductVariantImage | null;
+  available: boolean;
+  price: number;
+  weightInGrams?: number | undefined;
+  compareAtPrice: number;
+  position: number;
+  productId: number;
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
+};
+
+type ProductImage = ShopifyImageDimensions & {
+  id: number;
+  productId: number;
+  alt: string | null;
+  position: number;
+  src: string;
+  mediaType: "image" | "video";
+  variantIds: unknown[];
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
+};
+
+type MetaTag =
+  | { name: string; content: string }
+  | { property: string; content: string }
+  | { itemprop: string; content: string };
+```
