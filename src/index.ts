@@ -1,7 +1,9 @@
 import { filter, isNonNullish, map, toKebabCase, unique } from "remeda";
 import {
+  Collection,
   Product,
   ShopifyApiProduct,
+  ShopifyCollection,
   ShopifyProduct,
   ShopifySingleProduct,
 } from "./types";
@@ -51,7 +53,7 @@ export class Store {
           try {
             const price = Math.floor(
               Number.parseFloat(variant.price.toString()) * 100
-            );
+          );
             return Number.isFinite(price) ? price : 0;
           } catch {
             return 0;
@@ -128,7 +130,7 @@ export class Store {
         compareAtPriceVaries,
         discount,
         featuredImage: finalFeaturedImageUrl,
-        isProxyFeaturedImage: true, // This might need re-evaluation based on primary source
+        isProxyFeaturedImage: !finalFeaturedImageUrl,
         publishedAt: new Date(product.published_at),
         vendor: product.vendor,
         productType: product.product_type,
@@ -361,10 +363,10 @@ export class Store {
           ),
           taxable: variant.taxable,
           barcode: variant.barcode || null,
-          grams: variant.grams || 0,
-          weight: variant.weight || 0,
+          grams: variant.grams ?? null,
+          weight: variant.weight ?? null,
           weightUnit: variant.weight_unit || "g",
-          inventoryQuantity: variant.inventory_quantity || 0,
+          inventoryQuantity: variant.inventory_quantity ?? null,
           requiresShipping: variant.requires_shipping,
           available: variant.available ?? true,
           featuredImage,
@@ -407,43 +409,185 @@ export class Store {
     };
   }
 
+  private collectionsDto(collections: ShopifyCollection[]): Collection[] {
+    return collections.map((collection) => ({
+      id: collection.id.toString(),
+      title: collection.title,
+      handle: collection.handle,
+      description: collection.description,
+      productsCount: collection.products_count,
+      publishedAt: collection.published_at,
+      updatedAt: collection.updated_at,
+      image: collection.image ? {
+        id: collection.image?.id,
+        createdAt: collection.image?.created_at,
+        src: collection.image?.src,
+        alt: collection.image?.alt,
+      } : undefined,
+    }));
+  }
+
+  private async fetchProducts(page: number, limit: number): Promise<Product[] | null> {
+    try {
+      const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        products: ShopifyProduct[];
+      };
+      // urlPath = extractDomainWithoutSuffix(this.storeDomain); // No longer needed to reassign urlPath
+      const productsData = this.productsDto(data.products);
+      return productsData;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(
+          `Error fetching page ${page}:`,
+          this.baseUrl,
+          error.message
+        );
+      }
+      throw error;
+    }
+  };
+
+  private async fetchCollections(page: number, limit: number): Promise<Collection[] | null> {
+    try {
+      const url = `${this.baseUrl}collections.json?limit=${limit}&page=${page}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        collections: ShopifyCollection[];
+      };
+      const collectionsData = this.collectionsDto(data.collections);
+      return collectionsData;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(
+          `Error fetching page ${page}:`,
+          this.baseUrl,
+          error.message
+        );
+      }
+      throw error;
+    }
+  };
+
+  public store = {
+    info: async () => {
+      try {
+        const response = await fetch(this.baseUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const html = await response.text();
+
+        const getMetaTag = (name: string) => {
+          const regex = new RegExp(`<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`);
+          const match = html.match(regex);
+          return match ? match[1] : null;
+        };
+
+        const getPropertyMetaTag = (property: string) => {
+          const regex = new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`);
+          const match = html.match(regex);
+          return match ? match[1] : null;
+        }
+
+        const title = getMetaTag("og:title") || getMetaTag("twitter:title");
+
+        const description = getMetaTag("description") || getPropertyMetaTag("og:description");
+
+        const shopifyWalletId = getMetaTag("shopify-digital-wallet")?.split("/")[1];
+
+        const myShopifySubdomainMatch = html.match(/['"](.*?\.myshopify\.com)['"]/);
+        const myShopifySubdomain = myShopifySubdomainMatch ? myShopifySubdomainMatch[1] : null;
+
+        let logoUrl = getPropertyMetaTag("og:image") || getPropertyMetaTag("og:image:secure_url");
+        if (!logoUrl) {
+          const logoMatch = html.match(/<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/);
+          logoUrl = logoMatch ? logoMatch[1].replace('http://', 'https://') : null;
+        } else {
+          logoUrl = logoUrl.replace('http://', 'https://');
+        }
+
+        const socialLinks: Record<string, string> = {};
+        const socialRegex = /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
+        let socialMatch;
+        while ((socialMatch = socialRegex.exec(html)) !== null) {
+          const url = new URL(socialMatch[1]);
+          const domain = url.hostname.replace("www.", "").split('.')[0];
+          if (domain) {
+            socialLinks[domain] = socialMatch[1];
+          }
+        }
+
+        const contactLinks = {
+          tel: null as string | null,
+          email: null as string | null,
+          contactPage: null as string | null
+        };
+        
+        const contactRegex = new RegExp('<a[^>]+href=["\']((?:mailto:|tel:)[^"\']*|[^"\']*(?:\\/contact|\\/pages\\/contact)[^"\']*)["\']', 'g');
+        let contactMatch;
+        while ((contactMatch = contactRegex.exec(html)) !== null) {
+          const link = contactMatch[1];
+          if (link.startsWith('tel:')) {
+            contactLinks.tel = link.replace("tel:", "").trim();
+          } else if (link.startsWith('mailto:')) {
+            contactLinks.email = link.replace("mailto:", "").trim();
+          } else if (link.includes('/contact') || link.includes('/pages/contact')) {
+            contactLinks.contactPage = link;
+          }
+        }
+
+        const homePageProductLinks = html.match(/href=["']([^"']*\/products\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
+        const homePageCollectionLinks = html.match(/href=["']([^"']*\/collections\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
+        // const homePagePageLinks = html.match(/href=["']([^"']*\/pages\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
+
+        const jsonLd = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g)?.map(match => match.split('>')[1].replace(/<\/script/g, ''));
+        const jsonLdData = jsonLd?.map(json => JSON.parse(json));
+
+        return {
+          title,
+          description,
+          shopifyWalletId,
+          myShopifySubdomain,
+          logoUrl,
+          socialLinks,
+          contactLinks,
+          showcase: {
+            products: unique(homePageProductLinks ?? []),
+            collections: unique(homePageCollectionLinks ?? [])
+          },
+          jsonLdData
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error(`Error fetching store info:`, this.baseUrl, error.message);
+        }
+        throw error;
+      }
+    }
+  }
+
   public products = {
     all: async (): Promise<Product[] | null> => {
       const limit = 250;
       let allProducts: Product[] = [];
 
-      const fetchPage = async (page: number): Promise<Product[] | null> => {
-        try {
-          const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
-          const response = await fetch(url);
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = (await response.json()) as {
-            products: ShopifyProduct[];
-          };
-          // urlPath = extractDomainWithoutSuffix(this.storeDomain); // No longer needed to reassign urlPath
-          const productsData = this.productsDto(data.products);
-          return productsData;
-        } catch (error) {
-          if (error instanceof Error) {
-            console.error(
-              `Error fetching page ${page}:`,
-              this.baseUrl,
-              error.message
-            );
-          }
-          throw error;
-        }
-      };
-
       async function fetchAll(this: Store) {
         let currentPage = 1;
 
         while (true) {
-          const products = await fetchPage(currentPage);
+          const products = await this.fetchProducts.call(this, currentPage, limit);
 
           if (!products || products.length === 0 || products.length < limit) {
             if (products && products.length > 0) {
@@ -481,7 +625,7 @@ export class Store {
           console.error(
             `HTTP error! status: ${response.status} for ${this.storeDomain} page ${page}`
           );
-          return null;
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         // Corrected type assertion to match the 'all' method's 'fetchPage' function
         const data = (await response.json()) as {
@@ -524,4 +668,145 @@ export class Store {
       }
     },
   };
+
+  public collections = {
+    all: async (): Promise<Collection[]> => {
+      const limit = 250;
+      let allCollections: Collection[] = [];
+
+      async function fetchAll(this: Store) {
+        let currentPage = 1;
+
+        while (true) {
+          const collections = await this.fetchCollections.call(this, currentPage, limit);
+
+          if (!collections || collections.length === 0 || collections.length < limit) {
+            if (!collections) {
+              console.warn("fetchCollections returned null, treating as empty array.");
+              break;
+            }
+            if (collections && collections.length > 0) {
+              allCollections = [...allCollections, ...collections];
+            }
+            break;
+          }
+
+          allCollections = [...allCollections, ...collections];
+          currentPage++;
+        }
+        return allCollections;
+      }
+
+      try {
+        // Bind `this` for fetchAll if it uses `this.collectionsDto`
+        const collections = await fetchAll.call(this);
+        return collections || [];
+      } catch (error) {
+        console.error("Failed to fetch all collections:", this.storeDomain, error);
+        throw error;
+      }
+    },
+    find: async (collectionHandle: string): Promise<Collection | null> => {
+      try {
+        const url = `${this.baseUrl}collections/${collectionHandle}.js`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const collection = (await response.json()) as ShopifyCollection;
+        const collectionData = this.collectionsDto([collection]);
+        return collectionData[0] || null;
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error(
+            `Error fetching collection ${collectionHandle}:`,
+            this.baseUrl,
+            error.message
+          );  
+        }
+        throw error;
+      }
+    },
+    products: {
+      paginated: async (collectionHandle: string, options?: {
+        page?: number;
+        limit?: number;
+      }): Promise<Product[] | null> => {
+        try {
+          const page = options?.page ?? 1;
+          const limit = Math.min(options?.limit ?? 250, 250);
+          const url = `${this.baseUrl}collections/${collectionHandle}/products.json?limit=${limit}&page=${page}`;
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            console.error(
+              `HTTP error! status: ${response.status} for ${this.storeDomain} collection ${collectionHandle}`
+            );
+            return null;
+          }
+          const products = (await response.json()) as {
+            products: ShopifyProduct[];
+          };
+          const productsData = this.productsDto(products.products);
+          return productsData;
+        } catch (error) {
+          if (error instanceof Error) {
+            console.error(
+              `Error fetching products for collection ${collectionHandle}:`,
+              this.baseUrl,
+              error.message
+            );
+          }
+          throw error;
+        }
+      },
+      all: async (collectionHandle: string): Promise<Product[] | null> => {
+        try {
+          const limit = 250;
+          let allProducts: Product[] = [];
+
+          async function fetchAll(this: Store) {
+            let currentPage = 1;
+
+            while (true) {
+              const products = await this.fetchProducts.call(this, currentPage, limit);
+              if (!products || products.length === 0 || products.length < limit) {
+                if (products && products.length > 0) {
+                  allProducts = [...allProducts, ...products];
+                }
+                break;
+              }
+              allProducts = [...allProducts, ...products];
+              currentPage++;
+            }
+            return allProducts;
+          }
+
+          try {
+            // Bind `this` for fetchAll if it uses `this.productsDto`
+            const products = await fetchAll.call(this);
+            return products || [];
+          } catch (error) {
+            console.error(
+              `Error fetching all products for collection ${collectionHandle}:`,
+              this.baseUrl,
+              error
+            );
+            return null;
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching all products for collection ${collectionHandle}:`,
+            this.baseUrl,
+            error
+          );
+          return null;
+        }
+      },
+    }
+  };
 }
+
+
+// Test script for store.info

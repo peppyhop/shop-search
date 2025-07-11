@@ -37,6 +37,50 @@ Then, create a new instance of the Store class with your Shopify store's domain 
 const store = new Store("your-store-domain.com"); // must be a valid shopify store domain
 ```
 
+## Fetching Store Information
+
+To fetch store metadata including title, description, logo, social links and more, use the `store.info` method:
+
+```typescript
+const storeInfo = await store.store.info();
+```
+
+This returns an object containing:
+- `title`: Store title from meta tags
+- `description`: Store description
+- `shopifyWalletId`: Shopify digital wallet ID
+- `myShopifySubdomain`: The myshopify.com subdomain
+- `logoUrl`: Store logo URL (from meta tags or first matching image)
+- `socialLinks`: Object containing social media URLs
+- `contactLinks`: Object with tel, email and contact page links
+- `showcase`: Object with featured products and collections
+- `jsonLdData`: Parsed JSON-LD structured data
+
+Example response:
+```typescript
+{
+  title: "Store Name",
+  description: "Store description",
+  shopifyWalletId: "abc123",
+  myShopifySubdomain: "store-name.myshopify.com",
+  logoUrl: "https://cdn.shopify.com/.../logo.png",
+  socialLinks: {
+    facebook: "https://facebook.com/store",
+    instagram: "https://instagram.com/store"
+  },
+  contactLinks: {
+    tel: "+1234567890",
+    email: "contact@store.com",
+    contactPage: "/pages/contact"
+  },
+  showcase: {
+    products: ["product-handle1", "product-handle2"],
+    collections: ["collection-handle1"]
+  },
+  jsonLdData: [...] // Array of parsed JSON-LD objects
+}
+```
+
 ## Fetching Products
 ### Fetching All Products
 To fetch all products from your Shopify store, use the `getAllProducts` method:
@@ -58,9 +102,56 @@ To fetch a specific product by its handle, use the `getProduct` method:
 const product = await store.products.find("product-handle");
 ```
 
-### Response Type
+## Fetching Collections
+### Fetching All Collections
+To fetch all collections from your Shopify store, use the `collections.all` method:
+```typescript
+const collections = await store.collections.all();
+```
+
+### Finding a Specific Collection
+To find a specific collection by its handle, use the `collections.find` method:
+```typescript
+const collection = await store.collections.find("collection-handle");
+```
+
+### Fetching Products from a Collection
+To fetch products belonging to a specific collection, use the `collections.products` method.
+
+#### Fetching All Products from a Collection
+```typescript
+const productsInCollection = await store.collections.products.all("collection-handle");
+```
+
+#### Fetching Paginated Products from a Collection
+```typescript
+const paginatedProductsInCollection = await store.collections.products.paginated("collection-handle", {
+  page: 1,
+  limit: 25,
+});
+```
+
+## Response Type
 
 ```ts
+type StoreInfo = {
+  title: string | null;
+  description: string | null;
+  shopifyWalletId: string | null;
+  myShopifySubdomain: string | null;
+  logoUrl: string | null;
+  socialLinks: Record<string, string>;
+  contactLinks: {
+    tel: string | null;
+    email: string | null;
+    contactPage: string | null;
+  };
+  showcase: {
+    products: string[];
+    collections: string[];
+  };
+  jsonLdData: any[] | null;
+};
 type Product = {
   slug: string;
   handle: string;
@@ -149,4 +240,21 @@ type MetaTag =
   | { name: string; content: string }
   | { property: string; content: string }
   | { itemprop: string; content: string };
+
+type Collection = {
+  id: string;
+  title: string;
+  handle: string;
+  description: string;
+  productsCount: number;
+  publishedAt: string;
+  updatedAt: string;
+  image?: {
+    id?: number;
+    createdAt?: string;
+    src?: string;
+    alt?: string;
+  };
+};
 ```
+

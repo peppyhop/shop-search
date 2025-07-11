@@ -185,25 +185,6 @@ export type ShopifySingleProduct = ShopifyBaseProduct & {
   selling_plan_groups?: string[];
 };
 
-// Collection type
-export type ShopifyCollection = {
-  id: number;
-  title: string;
-  handle: string;
-  description?: string | undefined;
-  published_at: string;
-  updated_at: string;
-  image?:
-    | {
-        id: number;
-        created_at: string;
-        src: string;
-        alt?: string;
-      }
-    | undefined;
-  products_count: number;
-};
-
 // Search type
 export type ShopifyPredictiveProductSearch = {
   resources: {
@@ -413,5 +394,38 @@ export type Coupon = {
   description?: string | undefined;
 };
 
-// TrustLevel enum
-export type TrustLevel = "none" | "silver" | "gold";
+// Collection type
+export type ShopifyCollection = {
+  id: number;
+  title: string;
+  handle: string;
+  description?: string | undefined;
+  published_at: string;
+  updated_at: string;
+  image?:
+    | {
+        id: number;
+        created_at: string;
+        src: string;
+        alt?: string;
+      }
+    | undefined;
+  products_count: number;
+};
+
+
+export type Collection = {
+  id: string;
+  title: string;
+  handle: string;
+  description?: string | undefined;
+  image?: {
+    id: number;
+    createdAt: string;
+    src: string;
+    alt?: string;
+  };
+  productsCount: number;
+  publishedAt: string;
+  updatedAt: string;
+}
