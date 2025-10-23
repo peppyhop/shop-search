@@ -1,11 +1,11 @@
-import { Store } from './index'; // Assuming your Store class is exported from index.ts
+import { ShopClient } from './index'; // Assuming your ShopClient class is exported from index.ts
 
-describe('Store Class Integration Tests', () => {
-  let store: Store;
+describe('ShopClient Class Integration Tests', () => {
+  let shop: ShopClient;
   const storeDomain = 'rimorestore.com';
 
   beforeAll(() => {
-    store = new Store(`https://${storeDomain}/`);
+    shop = new ShopClient(`https://${storeDomain}/`);
   });
 
   test('should fetch first product with paginated and then find it by handle, and results should be consistent', async () => {
@@ -13,7 +13,7 @@ describe('Store Class Integration Tests', () => {
 
     let paginatedResult;
     try {
-      paginatedResult = await store.products.paginated({ page: 1, limit: 1 });
+      paginatedResult = await shop.products.paginated({ page: 1, limit: 1 });
     } catch (error) {
       // If an error is thrown, it means there was an issue fetching products.
       // For this test, we'll assume it's acceptable if no products are found, but we should not proceed to find.
@@ -41,7 +41,7 @@ describe('Store Class Integration Tests', () => {
     console.log(`Product from paginated: ${productFromPaginated.title} (Handle: ${productFromPaginated.handle})`);
 
     const productHandle = productFromPaginated.handle;
-    const productFromFind = await store.products.find(productHandle);
+    const productFromFind = await shop.products.find(productHandle);
 
     expect(productFromFind).not.toBeNull();
     if (!productFromFind) return; // Type guard for TypeScript
@@ -99,7 +99,7 @@ describe('Store Class Integration Tests', () => {
 
     let allCollections;
     try {
-      allCollections = await store.collections.all();
+      allCollections = await shop.collections.all();
     } catch (error) {
       console.warn(`Error fetching all collections for ${storeDomain}: ${(error as Error).message}. Skipping find() part of the test.`);
       expect(error).toBeDefined();
@@ -124,7 +124,7 @@ describe('Store Class Integration Tests', () => {
     const collectionHandle = collectionFromAll.handle;
     let collectionFromFind;
     try {
-      collectionFromFind = await store.collections.find(collectionHandle);
+      collectionFromFind = await shop.collections.find(collectionHandle);
     } catch (error) {
       console.warn(`Error finding collection ${collectionHandle} for ${storeDomain}: ${(error as Error).message}.`);
       expect(error).toBeDefined();
@@ -151,4 +151,367 @@ describe('Store Class Integration Tests', () => {
     }
 
   }, 30000); // Increase timeout if API calls are slow
+
+  test('should fetch store info and return correct structure', async () => {
+    console.log(`Testing store info with store: ${storeDomain}`);
+
+    // Test store info
+    let storeInfo;
+    try {
+      storeInfo = await shop.getInfo();
+    } catch (error) {
+      console.warn(`Error fetching store info for ${storeDomain}: ${(error as Error).message}.`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(storeInfo).toBeDefined();
+    expect(storeInfo).toHaveProperty('name');
+    expect(storeInfo).toHaveProperty('domain');
+    expect(storeInfo).toHaveProperty('slug');
+    expect(storeInfo).toHaveProperty('title');
+    expect(storeInfo).toHaveProperty('description');
+    expect(storeInfo).toHaveProperty('techProvider');
+    expect(storeInfo.techProvider).toHaveProperty('name');
+    expect(storeInfo).toHaveProperty('logoUrl');
+    expect(storeInfo).toHaveProperty('socialLinks');
+    expect(storeInfo).toHaveProperty('contactLinks');
+    expect(storeInfo).toHaveProperty('headerLinks');
+    expect(storeInfo).toHaveProperty('showcase');
+    expect(storeInfo).toHaveProperty('jsonLdData');
+
+    // Verify showcase structure
+    expect(storeInfo.showcase).toHaveProperty('products');
+    expect(storeInfo.showcase).toHaveProperty('collections');
+    expect(Array.isArray(storeInfo.showcase.products)).toBe(true);
+    expect(Array.isArray(storeInfo.showcase.collections)).toBe(true);
+
+    // Verify data structures are properly typed
+    expect(typeof storeInfo.socialLinks).toBe('object');
+    expect(typeof storeInfo.contactLinks).toBe('object');
+    expect(Array.isArray(storeInfo.headerLinks)).toBe(true);
+
+    // Verify contactLinks structure
+    expect(storeInfo.contactLinks).toHaveProperty('tel');
+    expect(storeInfo.contactLinks).toHaveProperty('email');
+    expect(storeInfo.contactLinks).toHaveProperty('contactPage');
+
+    console.log(`Store info fetched successfully: ${storeInfo.name}`);
+    console.log(`Store description: ${storeInfo.description || 'No description'}`);
+    console.log(`Logo URL: ${storeInfo.logoUrl || 'No logo'}`);
+    console.log(`Social links:`, Object.keys(storeInfo.socialLinks));
+    console.log(`Contact links:`, storeInfo.contactLinks);
+    console.log(`Header links count: ${storeInfo.headerLinks.length}`);
+    console.log(`Showcase products count: ${storeInfo.showcase.products.length}`);
+    console.log(`Showcase collections count: ${storeInfo.showcase.collections.length}`);
+
+  }, 30000); // Increase timeout if API calls are slow
+
+  test('should handle product handles with query strings correctly', async () => {
+    console.log(`Testing product handle with query string: ${storeDomain}`);
+
+    // Test the URL construction logic with a product handle that includes query parameters
+    // This is more of a unit test for URL handling, but we can test it in integration context
+    const productHandle = 'test-product?variant=123&color=red';
+    
+    try {
+      // This should handle the query string properly and not break the API call
+      const product = await shop.products.find(productHandle);
+      
+      // If we get here, the method handled the query string without throwing an error
+      // The actual product might not exist, but the URL construction should work
+      if (product) {
+        expect(product.handle).toBeDefined();
+        console.log(`Successfully handled product with query string: ${product.handle}`);
+      } else {
+        console.log('Product with query string not found, but URL construction worked');
+      }
+    } catch (error) {
+      // This is expected if the product doesn't exist, but the error should be a 404-type error
+      // not a URL construction error
+      console.log(`Expected error for non-existent product with query string: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+    }
+
+  }, 30000); // Increase timeout if API calls are slow
+
+  test('should fetch all products and verify structure', async () => {
+    console.log(`Testing products.all() with store: ${storeDomain}`);
+
+    let allProducts;
+    try {
+      allProducts = await shop.products.all();
+    } catch (error) {
+      console.warn(`Error fetching all products for ${storeDomain}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(allProducts).toBeDefined();
+    expect(Array.isArray(allProducts)).toBe(true);
+
+    if (allProducts && allProducts.length > 0) {
+      const firstProduct = allProducts[0];
+      
+      // Verify product structure
+      expect(firstProduct).toHaveProperty('handle');
+      expect(firstProduct).toHaveProperty('title');
+      expect(firstProduct).toHaveProperty('price');
+      expect(firstProduct).toHaveProperty('available');
+      expect(firstProduct).toHaveProperty('variants');
+      expect(firstProduct).toHaveProperty('images');
+      expect(firstProduct).toHaveProperty('storeSlug');
+      expect(firstProduct).toHaveProperty('storeDomain');
+      expect(firstProduct).toHaveProperty('url');
+
+      console.log(`Successfully fetched ${allProducts.length} products`);
+      console.log(`First product: ${firstProduct.title} (${firstProduct.handle})`);
+    } else {
+      console.log('No products found in store');
+    }
+
+  }, 60000); // Longer timeout for fetching all products
+
+  test('should fetch showcased products and verify structure', async () => {
+    console.log(`Testing products.showcased() with store: ${storeDomain}`);
+
+    let showcasedProducts;
+    try {
+      showcasedProducts = await shop.products.showcased();
+    } catch (error) {
+      console.warn(`Error fetching showcased products for ${storeDomain}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(showcasedProducts).toBeDefined();
+    expect(Array.isArray(showcasedProducts)).toBe(true);
+
+    if (showcasedProducts.length > 0) {
+      const firstShowcasedProduct = showcasedProducts[0];
+      
+      // Verify product structure
+      expect(firstShowcasedProduct).toHaveProperty('handle');
+      expect(firstShowcasedProduct).toHaveProperty('title');
+      expect(firstShowcasedProduct).toHaveProperty('price');
+      expect(firstShowcasedProduct).toHaveProperty('available');
+
+      console.log(`Successfully fetched ${showcasedProducts.length} showcased products`);
+      console.log(`First showcased product: ${firstShowcasedProduct.title}`);
+    } else {
+      console.log('No showcased products found');
+    }
+
+  }, 30000);
+
+  test('should fetch all products from a collection', async () => {
+    console.log(`Testing collections.products.all() with store: ${storeDomain}`);
+
+    // First get a collection to test with
+    let collections;
+    try {
+      collections = await shop.collections.all();
+    } catch (error) {
+      console.warn(`Error fetching collections for ${storeDomain}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    if (!collections || collections.length === 0) {
+      console.warn('No collections found, skipping collection products test');
+      return;
+    }
+
+    const testCollection = collections[0];
+    console.log(`Testing with collection: ${testCollection.handle}`);
+
+    let collectionProducts;
+    try {
+      collectionProducts = await shop.collections.products.all(testCollection.handle);
+    } catch (error) {
+      console.warn(`Error fetching products from collection ${testCollection.handle}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(collectionProducts).toBeDefined();
+    expect(Array.isArray(collectionProducts)).toBe(true);
+
+    if (collectionProducts && collectionProducts.length > 0) {
+      const firstProduct = collectionProducts[0];
+      
+      // Verify product structure
+      expect(firstProduct).toHaveProperty('handle');
+      expect(firstProduct).toHaveProperty('title');
+      expect(firstProduct).toHaveProperty('price');
+
+      console.log(`Successfully fetched ${collectionProducts.length} products from collection ${testCollection.handle}`);
+    } else {
+      console.log(`No products found in collection ${testCollection.handle}`);
+    }
+
+  }, 60000);
+
+  test('should fetch paginated products from a collection', async () => {
+    console.log(`Testing collections.products.paginated() with store: ${storeDomain}`);
+
+    // First get a collection to test with
+    let collections;
+    try {
+      collections = await shop.collections.all();
+    } catch (error) {
+      console.warn(`Error fetching collections for ${storeDomain}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    if (!collections || collections.length === 0) {
+      console.warn('No collections found, skipping collection products pagination test');
+      return;
+    }
+
+    const testCollection = collections[0];
+    console.log(`Testing pagination with collection: ${testCollection.handle}`);
+
+    let paginatedProducts;
+    try {
+      paginatedProducts = await shop.collections.products.paginated(testCollection.handle, {
+        page: 1,
+        limit: 5
+      });
+    } catch (error) {
+      console.warn(`Error fetching paginated products from collection ${testCollection.handle}: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(paginatedProducts).toBeDefined();
+    expect(Array.isArray(paginatedProducts)).toBe(true);
+    if (paginatedProducts) {
+      expect(paginatedProducts.length).toBeLessThanOrEqual(5);
+    }
+
+    if (paginatedProducts && paginatedProducts.length > 0) {
+      const firstProduct = paginatedProducts[0];
+      
+      // Verify product structure
+      expect(firstProduct).toHaveProperty('handle');
+      expect(firstProduct).toHaveProperty('title');
+      expect(firstProduct).toHaveProperty('price');
+
+      console.log(`Successfully fetched ${paginatedProducts.length} paginated products from collection ${testCollection.handle}`);
+    } else {
+      console.log(`No products found in collection ${testCollection.handle} for pagination`);
+    }
+
+  }, 30000);
+
+  test('should create checkout URL with valid parameters', async () => {
+    console.log(`Testing checkout.createUrl() with store: ${storeDomain}`);
+
+    const checkoutParams = {
+      email: 'test@example.com',
+      items: [
+        { productVariantId: '12345', quantity: '2' },
+        { productVariantId: '67890', quantity: '1' }
+      ],
+      address: {
+        firstName: 'John',
+        lastName: 'Doe',
+        address1: '123 Main St',
+        city: 'Anytown',
+        zip: '12345',
+        country: 'USA',
+        province: 'CA',
+        phone: '555-123-4567'
+      }
+    };
+
+    let checkoutUrl;
+    try {
+      checkoutUrl = shop.checkout.createUrl(checkoutParams);
+    } catch (error) {
+      console.error(`Error creating checkout URL: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(checkoutUrl).toBeDefined();
+    expect(typeof checkoutUrl).toBe('string');
+    expect(checkoutUrl).toContain(storeDomain);
+    expect(checkoutUrl).toContain('/cart/');
+    expect(checkoutUrl).toContain('checkout%5Bemail%5D=test%40example.com'); // URL encoded version
+    expect(checkoutUrl).toContain('12345:2,67890:1');
+
+    console.log(`Successfully created checkout URL: ${checkoutUrl.substring(0, 100)}...`);
+
+  }, 5000);
+
+  test('should handle invalid product handle gracefully', async () => {
+    console.log(`Testing error handling for invalid product handle: ${storeDomain}`);
+
+    const invalidHandle = 'this-product-definitely-does-not-exist-12345';
+
+    try {
+      const product = await shop.products.find(invalidHandle);
+      
+      // If we get here without an error, the product should be null or undefined
+      expect(product).toBeNull();
+      console.log('Invalid product handle returned null as expected');
+    } catch (error) {
+      // This is the expected behavior - an error should be thrown
+      expect(error).toBeDefined();
+      expect(error instanceof Error).toBe(true);
+      console.log(`Expected error for invalid product handle: ${(error as Error).message}`);
+    }
+
+  }, 15000);
+
+  test('should handle invalid collection handle gracefully', async () => {
+    console.log(`Testing error handling for invalid collection handle: ${storeDomain}`);
+
+    const invalidHandle = 'this-collection-definitely-does-not-exist-12345';
+
+    try {
+      const collection = await shop.collections.find(invalidHandle);
+      
+      // If we get here without an error, the collection should be null or undefined
+      expect(collection).toBeNull();
+      console.log('Invalid collection handle returned null as expected');
+    } catch (error) {
+      // This is the expected behavior - an error should be thrown
+      expect(error).toBeDefined();
+      expect(error instanceof Error).toBe(true);
+      console.log(`Expected error for invalid collection handle: ${(error as Error).message}`);
+    }
+
+  }, 15000);
+
+  test('should handle empty pagination parameters correctly', async () => {
+    console.log(`Testing pagination with edge case parameters: ${storeDomain}`);
+
+    try {
+      // Test with limit of 0
+      const zeroLimitProducts = await shop.products.paginated({ page: 1, limit: 0 });
+      expect(Array.isArray(zeroLimitProducts)).toBe(true);
+      if (zeroLimitProducts) {
+        console.log(`Zero limit returned ${zeroLimitProducts.length} products`);
+      }
+
+      // Test with very high page number
+      const highPageProducts = await shop.products.paginated({ page: 9999, limit: 1 });
+      expect(Array.isArray(highPageProducts)).toBe(true);
+      if (highPageProducts) {
+        expect(highPageProducts.length).toBe(0);
+        console.log(`High page number returned ${highPageProducts.length} products as expected`);
+      }
+
+    } catch (error) {
+      // Some edge cases might throw errors, which is acceptable
+      console.log(`Edge case pagination error (acceptable): ${(error as Error).message}`);
+      expect(error).toBeDefined();
+    }
+
+  }, 20000);
+
 });

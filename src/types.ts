@@ -1,8 +1,21 @@
+/**
+ * @fileoverview Type definitions for the shop-search package.
+ * 
+ * This file contains all TypeScript type definitions used throughout the shop-search library,
+ * including Shopify API response types, normalized product/collection types, and utility types.
+ * 
+ * @author shop-search
+ * @version 2.0.0
+ */
+
 // Simplified version of RequireAtLeastOne utility type
 type RequireAtLeastOne<T> = {
   [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
 }[keyof T];
 
+/**
+ * Supported audience demographics for product categorization.
+ */
 type Audience =
   | "adult_male"
   | "adult_female"
@@ -11,41 +24,61 @@ type Audience =
   | "adult_unisex"
   | "kid_unisex";
 
+/**
+ * Product category structure for organizing store inventory.
+ */
 type Category = {
   clothing?: string[];
   jewellery?: string[];
   accessories?: string[];
 };
 
+/**
+ * Special category for non-demographic specific products.
+ */
 type NoneCategory = {
   home_decor: string[];
   accessories: string[];
 };
 
+/**
+ * Complete store catalog structure with demographic-based categorization.
+ */
 export type StoreCatalog = RequireAtLeastOne<{
   [K in Audience]: RequireAtLeastOne<Category>;
 }> & {
   none: RequireAtLeastOne<NoneCategory>;
 };
-// Base types for common properties
+
+/**
+ * Base timestamp fields used across Shopify entities.
+ */
 export type ShopifyTimestamps = {
   created_at: string;
   updated_at: string;
 };
 
+/**
+ * Basic information fields common to Shopify entities.
+ */
 export type ShopifyBasicInfo = {
   id: number;
   title: string;
   handle: string;
 };
 
-// Image types
+/**
+ * Image dimension properties.
+ */
 export type ShopifyImageDimensions = {
   width: number;
   height: number;
   aspect_ratio?: number;
 };
 
+/**
+ * Shopify product image structure from API responses.
+ */
 export type ShopifyImage = ShopifyBasicInfo &
   ShopifyTimestamps &
   ShopifyImageDimensions & {
@@ -55,6 +88,9 @@ export type ShopifyImage = ShopifyBasicInfo &
     variant_ids: string[];
   };
 
+/**
+ * Shopify variant image structure with additional properties.
+ */
 export type ShopifyVariantImage = ShopifyBasicInfo &
   ShopifyTimestamps &
   ShopifyImageDimensions & {
@@ -65,6 +101,9 @@ export type ShopifyVariantImage = ShopifyBasicInfo &
     alt: string | null;
   };
 
+/**
+ * Featured media structure for products.
+ */
 export type ShopifyFeaturedMedia = {
   alt: string | null;
   id: number;
@@ -77,20 +116,27 @@ export type ShopifyFeaturedMedia = {
   };
 };
 
+/**
+ * Media structure supporting both images and videos.
+ */
 export type ShopifyMedia = ShopifyFeaturedMedia &
   ShopifyImageDimensions & {
     media_type: "image" | "video";
     src: string;
   };
 
-// Option type
+/**
+ * Product option structure (e.g., Size, Color).
+ */
 export type ShopifyOption = {
   name: string;
   position: number;
   values: string[];
 };
 
-// Variant types
+/**
+ * Base variant structure with common properties.
+ */
 export type ShopifyBaseVariant = ShopifyBasicInfo &
   ShopifyTimestamps & {
     option1: string | null;
@@ -103,6 +149,9 @@ export type ShopifyBaseVariant = ShopifyBasicInfo &
     product_id: number;
   };
 
+/**
+ * Product variant structure for Shopify products with basic properties.
+ */
 export type ShopifyProductVariant = ShopifyBaseVariant & {
   name?: string | undefined;
   options?: string[] | undefined;
@@ -125,6 +174,9 @@ export type ShopifyProductVariant = ShopifyBaseVariant & {
   compare_at_price?: string | number | undefined;
 };
 
+/**
+ * Enhanced product variant structure for single product API responses.
+ */
 export type ShopifySingleProductVariant = ShopifyBaseVariant & {
   featured_image: ShopifyVariantImage | null;
   featured_media: ShopifyFeaturedMedia | null;
@@ -143,7 +195,9 @@ export type ShopifySingleProductVariant = ShopifyBaseVariant & {
   selling_plan_allocations?: unknown[] | undefined;
 };
 
-// Product types
+/**
+ * Base product structure with common Shopify product properties.
+ */
 export type ShopifyBaseProduct = ShopifyBasicInfo &
   ShopifyTimestamps & {
     vendor: string;
@@ -151,6 +205,9 @@ export type ShopifyBaseProduct = ShopifyBasicInfo &
     options: ShopifyOption[];
   };
 
+/**
+ * Standard Shopify product structure from products API.
+ */
 export type ShopifyProduct = ShopifyBaseProduct & {
   body_html: string;
   body?: string | undefined;
@@ -160,8 +217,14 @@ export type ShopifyProduct = ShopifyBaseProduct & {
   images: ShopifyImage[];
 };
 
+/**
+ * Alias for ShopifyProduct with store context.
+ */
 export type ShopifyProductAndStore = ShopifyProduct;
 
+/**
+ * Enhanced single product structure with additional pricing and availability data.
+ */
 export type ShopifySingleProduct = ShopifyBaseProduct & {
   description: string;
   published_at: string;
@@ -185,7 +248,9 @@ export type ShopifySingleProduct = ShopifyBaseProduct & {
   selling_plan_groups?: string[];
 };
 
-// Search type
+/**
+ * Shopify predictive search API response structure.
+ */
 export type ShopifyPredictiveProductSearch = {
   resources: {
     results: {
@@ -198,7 +263,9 @@ export type ShopifyPredictiveProductSearch = {
   };
 };
 
-// Define additional base types for Product
+/**
+ * Normalized pricing information for products.
+ */
 export type ProductPricing = {
   price: number;
   priceMin: number;
@@ -212,6 +279,9 @@ export type ProductPricing = {
   currency?: string;
 };
 
+/**
+ * Product option structure (e.g., Size, Color) for normalized products.
+ */
 export type ProductOption = {
   key: string;
   data: string[];
@@ -220,6 +290,9 @@ export type ProductOption = {
   values: string[];
 };
 
+/**
+ * Normalized product variant image structure.
+ */
 export type ProductVariantImage = ShopifyImageDimensions & {
   id: number;
   src: string;
@@ -232,6 +305,9 @@ export type ProductVariantImage = ShopifyImageDimensions & {
   alt: string | null;
 };
 
+/**
+ * Normalized product variant structure used by the library.
+ */
 export type ProductVariant = {
   id: string;
   platformId?: string | undefined;
@@ -255,6 +331,9 @@ export type ProductVariant = {
   updatedAt?: string | undefined;
 };
 
+/**
+ * Normalized product image structure.
+ */
 export type ProductImage = ShopifyImageDimensions & {
   id: number;
   productId: number;
@@ -267,12 +346,18 @@ export type ProductImage = ShopifyImageDimensions & {
   updatedAt?: string | undefined;
 };
 
+/**
+ * HTML meta tag structure for SEO data.
+ */
 export type MetaTag =
   | { name: string; content: string }
   | { property: string; content: string }
   | { itemprop: string; content: string };
 
-// Refactored Product type
+/**
+ * Main normalized product structure returned by the library.
+ * This is the primary interface for working with products.
+ */
 export type Product = {
   slug: string;
   handle: string;
@@ -314,7 +399,9 @@ export type Product = {
   sellingPlanGroups?: unknown;
 };
 
-// Refactored ShopifyApiProduct type
+/**
+ * Alternative product structure for API responses with normalized field names.
+ */
 export type ShopifyApiProduct = ShopifyBasicInfo & {
   bodyHtml: string;
   body?: string | undefined;
@@ -342,6 +429,10 @@ export type ShopifyApiProduct = ShopifyBasicInfo & {
   options: ShopifyOption[];
 };
 
+/**
+ * Store homepage information extracted from HTML parsing.
+ * @internal
+ */
 type StoreHomepageInfo = {
   productLinks: string[];
   collectionLinks: string[];
@@ -349,14 +440,18 @@ type StoreHomepageInfo = {
   productImageUrls?: string[];
 };
 
-// Define base types for catalog categories
+/**
+ * Product category structure for store catalogs.
+ */
 export type CatalogCategory = {
   clothing?: string[] | undefined;
   jewellery?: string[] | undefined;
   accessories?: string[] | undefined;
 };
 
-// Define demographic types
+/**
+ * Demographic categories for product targeting.
+ */
 export type Demographics =
   | "adult_male"
   | "adult_female"
@@ -365,12 +460,16 @@ export type Demographics =
   | "kid_female"
   | "kid_unisex";
 
-// Refactored ValidStoreCatalog type
+/**
+ * Valid store catalog structure with demographic-based organization.
+ */
 export type ValidStoreCatalog = {
   [key in Demographics]?: CatalogCategory | undefined;
 };
 
-// Address type
+/**
+ * Physical address structure for shipping and contact information.
+ */
 export type Address = {
   addressLine1: string;
   addressLine2?: string | undefined;
@@ -381,20 +480,26 @@ export type Address = {
   label?: string | undefined;
 };
 
-// Contact URLs type
+/**
+ * Contact URL structure for store communication channels.
+ */
 export type ContactUrls = {
   whatsapp?: string | undefined;
   tel?: string | undefined;
   email?: string | undefined;
 };
 
-// Coupon type
+/**
+ * Coupon/discount code structure.
+ */
 export type Coupon = {
   label: string;
   description?: string | undefined;
 };
 
-// Collection type
+/**
+ * Shopify collection structure from API responses.
+ */
 export type ShopifyCollection = {
   id: number;
   title: string;
@@ -413,6 +518,50 @@ export type ShopifyCollection = {
   products_count: number;
 };
 
+/**
+ * Main normalized collection structure returned by the library.
+ * This is the primary interface for working with collections.
+ */
+/**
+ * Country detection result with confidence scoring.
+ */
+/**
+ * Result of country detection analysis for a Shopify store.
+ * Contains the detected country as an ISO 3166-1 alpha-2 code.
+ */
+export type CountryDetectionResult = {
+  /** The detected country as ISO 3166-1 alpha-2 code (e.g., "US", "GB") or "Unknown" if no reliable detection */
+  country: string;
+  /** Confidence score between 0 and 1 (higher = more confident) */
+  confidence: number;
+  /** Array of detection signals that contributed to the result */
+  signals: string[];
+};
+
+/**
+ * Country scoring data for internal calculations.
+ */
+export type CountryScore = {
+  score: number;
+  reasons: string[];
+};
+
+/**
+ * Country scores mapping for detection algorithm.
+ */
+export type CountryScores = {
+  [country: string]: CountryScore;
+};
+
+/**
+ * Shopify features data structure from script tags.
+ */
+export type ShopifyFeaturesData = {
+  country?: string;
+  locale?: string;
+  moneyFormat?: string;
+  [key: string]: any;
+};
 
 export type Collection = {
   id: string;

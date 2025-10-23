@@ -1,812 +1,843 @@
-import { filter, isNonNullish, map, toKebabCase, unique } from "remeda";
+import { unique } from "remeda";
+import { CheckoutOperations, createCheckoutOperations } from "./checkout";
+import { CollectionOperations, createCollectionOperations } from "./collections";
+import { createProductOperations, ProductOperations } from "./products";
+import { createStoreOperations, StoreInfo, StoreOperations } from "./store";
 import {
   Collection,
   Product,
-  ShopifyApiProduct,
   ShopifyCollection,
   ShopifyProduct,
   ShopifySingleProduct,
 } from "./types";
+import { detectShopifyCountry } from "./utils/detect-country";
 import {
-  calculateDiscount,
+  extractDomainWithoutSuffix,
   generateStoreSlug,
   genProductSlug,
 } from "./utils/func";
 
-export class Store {
+/**
+ * A comprehensive Shopify store client for fetching products, collections, and store information.
+ * 
+ * @example
+ * ```typescript
+ * import { ShopClient } from 'shop-search';
+ * 
+ * const shop = new ShopClient('https://your-store.myshopify.com');
+ * 
+ * // Fetch all products
+ * const products = await shop.products.all();
+ * 
+ * // Get store information
+ * const storeInfo = await shop.getInfo();
+ * ```
+ */
+export class ShopClient {
   private storeDomain: string;
   private baseUrl: string;
+  private validationCache: Map<string, boolean> = new Map(); // Simple cache for validation results
+  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes cache expiry
+  private cacheTimestamps: Map<string, number> = new Map();
 
+  // Cache frequently used values to avoid recalculation
+  private storeSlug: string;
+  private normalizeImageUrlCache: Map<string, string> = new Map();
+  private storeOperations: StoreOperations;
+
+  // Public operations interfaces
+  public products: ProductOperations;
+  public collections: CollectionOperations;
+  public checkout: CheckoutOperations;
+
+  /**
+   * Creates a new ShopClient instance for interacting with a Shopify store.
+   * 
+   * @param urlPath - The Shopify store URL (e.g., 'https://your-store.myshopify.com' or 'your-store.myshopify.com')
+   * 
+   * @throws {Error} When the URL is invalid or contains malicious patterns
+   * 
+   * @example
+   * ```typescript
+   * // With full URL
+   * const shop = new ShopClient('https://example.myshopify.com');
+   * 
+   * // Without protocol (automatically adds https://)
+   * const shop = new ShopClient('example.myshopify.com');
+   * ```
+   */
   constructor(urlPath: string) {
-    const storeUrl = new URL(urlPath);
-    this.storeDomain = `https://${storeUrl.hostname}`;
-    let fetchUrl = `https://${storeUrl.hostname}${storeUrl.pathname}`;
+    // Validate input URL
+    if (!urlPath || typeof urlPath !== 'string') {
+      throw new Error('Store URL is required and must be a string');
+    }
+
+    // Sanitize and validate URL
+    let normalizedUrl = urlPath.trim();
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+
+    let storeUrl: URL;
+    try {
+      storeUrl = new URL(normalizedUrl);
+    } catch (error) {
+      throw new Error('Invalid store URL format');
+    }
+
+    // Validate domain format (basic check for Shopify domains)
+    const hostname = storeUrl.hostname;
+    if (!hostname || hostname.length < 3) {
+      throw new Error('Invalid domain name');
+    }
+
+    // Check for potentially malicious patterns
+    if (hostname.includes('..') || hostname.includes('//') || hostname.includes('@')) {
+      throw new Error('Invalid characters in domain name');
+    }
+
+    // Ensure it's a valid domain pattern
+    const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!domainPattern.test(hostname)) {
+      throw new Error('Invalid domain format');
+    }
+
+    this.storeDomain = `https://${hostname}`;
+    let fetchUrl = `https://${hostname}${storeUrl.pathname}`;
     if (!fetchUrl.endsWith("/")) {
       fetchUrl = `${fetchUrl}/`;
     }
     this.baseUrl = fetchUrl;
-  }
 
-  private productsDto(products: ShopifyProduct[]): Product[] | null {
-    const storeSlug = generateStoreSlug(this.storeDomain);
-    const data: Product[] = [];
+    // Pre-calculate store slug once
+    this.storeSlug = generateStoreSlug(this.storeDomain);
 
-    const normalizeImageUrl = (url?: string | null): string => {
-      if (!url) return "";
-      let newUrl = url.split("?")[0];
-      if (newUrl.startsWith("//")) {
-        newUrl = "https:" + newUrl;
-      }
-      return newUrl;
-    };
-
-    for (const product of products) {
-      if (
-        !product.images ||
-        product.images.length === 0 ||
-        !product.images[0]?.src
-      )
-        continue; // Added more robust check
-      // Safe price calculation with fallback to 0
-      const priceArr = unique(
-        product.variants.map((variant) => {
-          try {
-            const price = Math.floor(
-              Number.parseFloat(variant.price.toString()) * 100
-          );
-            return Number.isFinite(price) ? price : 0;
-          } catch {
-            return 0;
-          }
-        })
-      ).filter((price) => price > 0); // Filter out negative prices
-
-      const priceMin = priceArr.length > 0 ? Math.min(...priceArr) : 0;
-      const priceMax = priceArr.length > 0 ? Math.max(...priceArr) : 0;
-      const priceVaries = priceMin !== priceMax;
-      const price = priceMin;
-
-      // Safe compare_at_price calculation with fallback to 0
-      const compareAtPriceArr = unique(
-        product.variants
-          .map((variant) => {
-            try {
-              const price = variant.compare_at_price
-                ? Math.floor(
-                    Number.parseFloat(variant.compare_at_price.toString()) * 100
-                  )
-                : 0;
-              return Number.isFinite(price) ? price : 0;
-            } catch {
-              return 0;
-            }
-          })
-          .filter((price) => price > 0) // Filter out negative prices
-      );
-
-      const compareAtPriceMin =
-        compareAtPriceArr.length > 0 ? Math.min(...compareAtPriceArr) : 0;
-      const compareAtPriceMax =
-        compareAtPriceArr.length > 0 ? Math.max(...compareAtPriceArr) : 0;
-      const compareAtPriceVaries = compareAtPriceMin !== compareAtPriceMax;
-      const compareAtPrice = compareAtPriceMin;
-
-      // Safe discount calculation
-      const discount =
-        compareAtPrice > 0 && price > 0
-          ? calculateDiscount(price, compareAtPrice)
-          : 0;
-
-      const finalFeaturedImageUrl = normalizeImageUrl(product.images[0].src);
-
-      const options = product.options
-        .filter((option) => option.name.toLowerCase() !== "title")
-        .map((option) => ({
-          ...option,
-          key: toKebabCase(option.name),
-          data: filter(
-            map(option.values, (value) => value.toLowerCase()),
-            isNonNullish
-          ),
-        }));
-      const p: Product = {
-        slug: genProductSlug({
-          handle: product.handle,
-          storeDomain: this.storeDomain,
-        }),
-        storeSlug,
-        storeDomain: this.storeDomain,
-        platformId: product.id.toString(),
-        title: product.title,
-        handle: product.handle,
-        bodyHtml: product.body_html,
-        price: price,
-        priceMin: priceMin,
-        priceMax: priceMax,
-        priceVaries,
-        compareAtPrice: compareAtPrice,
-        compareAtPriceMin: compareAtPriceMin,
-        compareAtPriceMax: compareAtPriceMax,
-        compareAtPriceVaries,
-        discount,
-        featuredImage: finalFeaturedImageUrl,
-        isProxyFeaturedImage: !finalFeaturedImageUrl,
-        publishedAt: new Date(product.published_at),
-        vendor: product.vendor,
-        productType: product.product_type,
-        tags: product.tags,
-        variants: product.variants.map((variant) => {
-          const featuredImage = variant.featured_image
-            ? {
-                id: variant.featured_image.id,
-                src: variant.featured_image.src,
-                width: variant.featured_image.width,
-                height: variant.featured_image.height,
-                position: variant.featured_image.position,
-                productId: variant.featured_image.product_id,
-                aspectRatio: variant.featured_image.aspect_ratio,
-                variantIds: variant.featured_image.variant_ids || [],
-                createdAt: variant.featured_image.created_at,
-                updatedAt: variant.featured_image.updated_at,
-                alt: variant.featured_image.alt ?? null,
-              }
-            : null;
-
-          const variantPrice = Math.floor(
-            Number.parseFloat(variant.price.toString()) * 100
-          );
-          const variantCompareAtPrice = Math.floor(
-            Number.parseFloat((variant.compare_at_price ?? 0).toString()) * 100
-          );
-          return {
-            id: `${variant.id}-by-${storeSlug}`,
-            platformId: variant.id.toString(),
-            productId: variant.product_id || product.id,
-            title: variant.title,
-            price: variantPrice,
-            compareAtPrice: variantCompareAtPrice,
-            discount: calculateDiscount(variantPrice, variantCompareAtPrice),
-            sku: variant.sku,
-            position: variant.position,
-            inventoryPolicy: null,
-            fulfillmentService: null,
-            inventoryManagement: null,
-            option1: variant.option1,
-            option2: variant.option2,
-            option3: variant.option3,
-            options: filter(
-              [variant.option1, variant.option2, variant.option3],
-              isNonNullish
-            ),
-            taxable: variant.taxable,
-            barcode: null,
-            grams: variant.weightInGrams,
-            weight: variant.weightInGrams,
-            weightUnit: "grams",
-            inventoryQuantity: null,
-            requiresShipping: variant.requires_shipping,
-            available: variant.available,
-            featuredImage,
-            url: `${this.storeDomain}/products/${product.handle}?variant=${variant.id}`,
-          };
-        }),
-        options,
-        images: product.images.map((image, index) => ({
-          id: image.id,
-          productId: image.product_id,
-          position: image.position || 0,
-          variantIds: image.variant_ids || [],
-          src: normalizeImageUrl(image.src), // Normalize all image srcs
-          width: image.width || 0,
-          height: image.height || 0,
-          alt: `${product.title} image ${index + 1}`,
-          mediaType:
-            "image" as ShopifyApiProduct["images"][number]["mediaType"],
-          aspectRatio: image.aspect_ratio,
-        })),
-        url: `${this.storeDomain}/products/${product.handle}`,
-        available: product.variants.some((variant) => variant.available),
-      };
-      data.push(p);
-    }
-    return data;
-  }
-
-  private productDto(product: ShopifySingleProduct): Product {
-    const slug = genProductSlug({
-      handle: product.handle,
+    // Initialize operations
+    this.storeOperations = createStoreOperations({
+      baseUrl: this.baseUrl,
       storeDomain: this.storeDomain,
+      validateProductExists: this.validateProductExists.bind(this),
+      validateCollectionExists: this.validateCollectionExists.bind(this),
+      validateLinksInBatches: this.validateLinksInBatches.bind(this),
+      handleFetchError: this.handleFetchError.bind(this)
     });
-    const storeSlug = generateStoreSlug(this.storeDomain);
-
-    const normalizeImageUrl = (url?: string | null): string => {
-      if (!url) return "";
-      let newUrl = url.split("?")[0];
-      if (newUrl.startsWith("//")) {
-        newUrl = "https:" + newUrl;
-      }
-      return newUrl;
-    };
-
-    const compareAtPrice = product.compare_at_price
-      ? Number.parseFloat(product.compare_at_price.toString())
-      : 0;
-
-    let rawFeaturedImageUrlFromSource: string | undefined | null =
-      product.featured_image;
-
-    // Fallback for featured image if product.featured_image is not available
-    if (
-      !rawFeaturedImageUrlFromSource &&
-      product.images &&
-      product.images.length > 0 &&
-      typeof product.images[0] === "string"
-    ) {
-      rawFeaturedImageUrlFromSource = product.images[0];
-    }
-    // Further fallback to media if still not found
-    if (
-      !rawFeaturedImageUrlFromSource &&
-      product.media &&
-      product.media.length > 0 &&
-      product.media[0]?.src
-    ) {
-      rawFeaturedImageUrlFromSource = product.media[0].src;
-    }
-
-    const finalFeaturedImageUrl = normalizeImageUrl(
-      rawFeaturedImageUrlFromSource
+    
+    this.products = createProductOperations(
+      this.baseUrl,
+      this.storeDomain,
+      this.fetchProducts.bind(this),
+      this.productsDto.bind(this),
+      this.productDto.bind(this),
+      () => this.getInfo(),
+      (handle: string) => this.products.find(handle)
     );
+    
+    this.collections = createCollectionOperations(
+      this.baseUrl,
+      this.storeDomain,
+      this.fetchCollections.bind(this),
+      this.collectionsDto.bind(this),
+      this.fetchPaginatedProductsFromCollection.bind(this),
+      () => this.getInfo(),
+      (handle: string) => this.collections.find(handle)
+    );
+    
+    this.checkout = createCheckoutOperations(this.baseUrl);
+  }
 
-    const medias = product.media?.map((media, index) => {
-      const variantIds = product.variants
-        .filter((v) => v.featured_media?.id === media.id)
-        .map((v) => `${v.id}-by-${storeSlug}`);
-      return {
-        id: media.id,
-        productId: product.id,
-        position: media.position,
-        alt: media.alt || `${product.title} image ${index + 1}`,
-        mediaType: media.media_type,
-        src: normalizeImageUrl(media.src), // Normalize media src
-        width: media.width,
-        height: media.height,
-        aspectRatio: media.aspect_ratio,
-        previewImage: media.preview_image,
-        variantIds,
-        variant_ids: variantIds,
-      };
-    });
-    const images = medias?.map((media) => ({
-      id: media.id,
-      productId: product.id,
-      position: media.position,
-      variantIds: media.variantIds,
-      src: media.src, // Already normalized from medias mapping
-      width: media.width,
-      height: media.height,
-      alt: media.alt,
-      mediaType: media.mediaType,
-      aspectRatio: media.aspectRatio,
-    }));
+  /**
+   * Optimized image URL normalization with caching
+   */
+  private normalizeImageUrl(url?: string | null): string {
+    if (!url) {
+      return "";
+    }
+
+    if (this.normalizeImageUrlCache.has(url)) {
+      return this.normalizeImageUrlCache.get(url)!;
+    }
+
+    const normalized = url.startsWith("//") ? `https:${url}` : url;
+    this.normalizeImageUrlCache.set(url, normalized);
+    return normalized;
+  }
+
+  /**
+   * Calculate price statistics for variants
+   */
+  private calculatePriceStats(variants: any[], priceField: string) {
+    const prices = variants
+      .map((variant) => parseFloat(variant[priceField]))
+      .filter((price) => !isNaN(price));
+
+    if (prices.length === 0) {
+      return { min: "0.00", max: "0.00" };
+    }
+
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
 
     return {
-      slug,
-      storeSlug,
-      storeDomain: this.storeDomain,
-      platformId: product.id.toString(),
-      title: product.title,
-      handle: product.handle,
-      bodyHtml: product.description,
-      publishedAt: new Date(product.published_at),
-      vendor: product.vendor,
-      productType: product.type,
-      tags: product.tags,
-      price: Number.parseFloat(product.price_min.toString()),
-      priceMin: Number.parseFloat(product.price_min.toString()),
-      priceMax: Number.parseFloat(product.price_max.toString()),
-      compareAtPrice,
-      compareAtPriceMin: Number.parseFloat(
-        product.compare_at_price_min.toString()
-      ),
-      compareAtPriceMax: Number.parseFloat(
-        product.compare_at_price_max.toString()
-      ),
-      discount: calculateDiscount(
-        Number.parseFloat(product.price_min.toString()),
-        Number.parseFloat(compareAtPrice.toString())
-      ),
-      available: product.available,
-      priceVaries: product.price_varies,
-      compareAtPriceVaries: product.compare_at_price_varies,
-      variants: product.variants.map((variant) => {
-        const featuredImage = variant.featured_image
-          ? {
-              id: variant.featured_image.id,
-              src: variant.featured_image.src,
-              width: variant.featured_image.width,
-              height: variant.featured_image.height,
-              position: variant.featured_image.position,
-              productId: variant.featured_image.product_id,
-              aspectRatio:
-                variant.featured_image.width / variant.featured_image.height,
-              variantIds: variant.featured_image.variant_ids || [],
-              createdAt: variant.featured_image.created_at,
-              updatedAt: variant.featured_image.updated_at,
-              alt: variant.featured_image.alt,
-            }
-          : null;
-
-        const variantPrice = Number.parseFloat(variant.price);
-        const variantCompareAtPrice = Number.parseFloat(
-          variant.compare_at_price || "0"
-        );
-        return {
-          id: `${variant.id}-by-${storeSlug}`,
-          platformId: variant.id.toString(),
-          productId: variant.product_id,
-          title: variant.title,
-          price: variantPrice,
-          compareAtPrice: variantCompareAtPrice,
-          discount: calculateDiscount(variantPrice, variantCompareAtPrice),
-          sku: variant.sku || "",
-          position: variant.position,
-          inventoryPolicy: variant.inventory_policy || null,
-          fulfillmentService: variant.fulfillment_service || null,
-          inventoryManagement: variant.inventory_management,
-          option1: variant.option1,
-          option2: variant.option2,
-          option3: variant.option3,
-          options: filter(
-            [variant.option1, variant.option2, variant.option3],
-            isNonNullish
-          ),
-          taxable: variant.taxable,
-          barcode: variant.barcode || null,
-          grams: variant.grams ?? null,
-          weight: variant.weight ?? null,
-          weightUnit: variant.weight_unit || "g",
-          inventoryQuantity: variant.inventory_quantity ?? null,
-          requiresShipping: variant.requires_shipping,
-          available: variant.available ?? true,
-          featuredImage,
-          url: `${this.storeDomain}/products/${product.handle}?variant=${variant.id}`,
-        };
-      }),
-      options: product.options
-        .filter((x) => x.name.toLowerCase() !== "title")
-        .map((option) => ({
-          ...option,
-          key: toKebabCase(option.name),
-          data: filter(
-            map(option.values, (value) => value.toLowerCase()),
-            isNonNullish
-          ),
-        })),
-      featuredImage: finalFeaturedImageUrl, // CORRECTED: Use the normalized variable
-      isProxyFeaturedImage: !product.featured_image, // Review this logic
-      images: !images
-        ? product.images.map((imageSrc, index) => ({
-            id: 0, // Single product format might not have image IDs
-            productId: product.id,
-            position: index,
-            variantIds: [],
-            src: imageSrc,
-            width: 0, // These might not be available in the single product format
-            height: 0,
-            alt: `${product.title} image ${index + 1}`,
-            mediaType: "image",
-            aspectRatio: 1, // Default aspect ratio
-          }))
-        : images,
-      // Handle media if available
-      ...(product.media && {
-        medias,
-      }),
-      url: product.url ?? `${this.storeDomain}/products/${product.handle}`,
-      requiresSellingPlan: product.requires_selling_plan,
-      sellingPlanGroups: product.selling_plan_groups || [],
+      min: minPrice.toFixed(2),
+      max: maxPrice.toFixed(2),
     };
   }
 
-  private collectionsDto(collections: ShopifyCollection[]): Collection[] {
+  /**
+   * Transform Shopify products to our Product format
+   */
+  productsDto(
+    products: ShopifyProduct[]
+  ): Product[] | null {
+    if (!products || products.length === 0) {
+      return null;
+    }
+    
+    return products.map((product) => ({
+      slug: genProductSlug({ handle: product.handle, storeDomain: this.storeDomain }),
+      handle: product.handle,
+      platformId: product.id.toString(),
+      title: product.title,
+      available: product.variants.some(v => v.available),
+      price: Math.min(...product.variants.map(v => typeof v.price === 'string' ? parseFloat(v.price) * 100 : v.price)),
+      priceMin: Math.min(...product.variants.map(v => typeof v.price === 'string' ? parseFloat(v.price) * 100 : v.price)),
+      priceMax: Math.max(...product.variants.map(v => typeof v.price === 'string' ? parseFloat(v.price) * 100 : v.price)),
+      priceVaries: product.variants.length > 1 && new Set(product.variants.map(v => typeof v.price === 'string' ? parseFloat(v.price) * 100 : v.price)).size > 1,
+      compareAtPrice: Math.min(...product.variants.map(v => v.compare_at_price ? (typeof v.compare_at_price === 'string' ? parseFloat(v.compare_at_price) * 100 : v.compare_at_price) : 0)),
+      compareAtPriceMin: Math.min(...product.variants.map(v => v.compare_at_price ? (typeof v.compare_at_price === 'string' ? parseFloat(v.compare_at_price) * 100 : v.compare_at_price) : 0)),
+      compareAtPriceMax: Math.max(...product.variants.map(v => v.compare_at_price ? (typeof v.compare_at_price === 'string' ? parseFloat(v.compare_at_price) * 100 : v.compare_at_price) : 0)),
+      compareAtPriceVaries: product.variants.length > 1 && new Set(product.variants.map(v => v.compare_at_price ? (typeof v.compare_at_price === 'string' ? parseFloat(v.compare_at_price) * 100 : v.compare_at_price) : 0)).size > 1,
+      discount: 0, // Calculate if needed
+      currency: 'USD', // Default or extract from store
+      options: product.options.map(option => ({
+        key: option.name.toLowerCase().replace(/\s+/g, '_'),
+        data: option.values,
+        name: option.name,
+        position: option.position,
+        values: option.values
+      })),
+      bodyHtml: product.body_html || null,
+      active: true,
+      productType: product.product_type || null,
+      tags: Array.isArray(product.tags) ? product.tags : [],
+      vendor: product.vendor,
+      featuredImage: product.images.length > 0 ? this.normalizeImageUrl(product.images[0].src) : null,
+      isProxyFeaturedImage: false,
+      createdAt: product.created_at ? new Date(product.created_at) : undefined,
+      updatedAt: product.updated_at ? new Date(product.updated_at) : undefined,
+      variants: product.variants.map(variant => ({
+        id: variant.id.toString(),
+        platformId: variant.id.toString(),
+        name: variant.name,
+        title: variant.title,
+        option1: variant.option1 || null,
+        option2: variant.option2 || null,
+        option3: variant.option3 || null,
+        options: [variant.option1, variant.option2, variant.option3].filter(Boolean) as string[],
+        sku: variant.sku || null,
+        requiresShipping: variant.requires_shipping,
+        taxable: variant.taxable,
+        featuredImage: variant.featured_image ? {
+          id: variant.featured_image.id,
+          src: variant.featured_image.src,
+          width: variant.featured_image.width,
+          height: variant.featured_image.height,
+          position: variant.featured_image.position,
+          productId: variant.featured_image.product_id,
+          aspectRatio: variant.featured_image.aspect_ratio,
+          variantIds: variant.featured_image.variant_ids || [],
+          createdAt: variant.featured_image.created_at,
+          updatedAt: variant.featured_image.updated_at,
+          alt: variant.featured_image.alt
+        } : null,
+        available: variant.available,
+        price: typeof variant.price === 'string' ? parseFloat(variant.price) * 100 : variant.price, // Convert string prices from dollars to cents
+        weightInGrams: variant.weightInGrams,
+        compareAtPrice: variant.compare_at_price ? (typeof variant.compare_at_price === 'string' ? parseFloat(variant.compare_at_price) * 100 : variant.compare_at_price) : 0, // Convert string prices from dollars to cents
+        position: variant.position,
+        productId: variant.product_id,
+        createdAt: variant.created_at,
+        updatedAt: variant.updated_at
+      })),
+      images: product.images.map(image => ({
+        id: image.id,
+        productId: image.product_id,
+        alt: null, // ShopifyImage doesn't have alt property
+        position: image.position,
+        src: this.normalizeImageUrl(image.src),
+        width: image.width,
+        height: image.height,
+        mediaType: 'image' as const,
+        variantIds: image.variant_ids || [],
+        createdAt: image.created_at,
+        updatedAt: image.updated_at
+      })),
+      publishedAt: new Date(product.published_at),
+      seo: null,
+      metaTags: null,
+      displayScore: undefined,
+      deletedAt: null,
+      storeSlug: this.storeDomain,
+      storeDomain: this.storeDomain,
+      url: `${this.storeDomain}/products/${product.handle}`
+    }));
+  }
+
+  productDto(
+    product: ShopifySingleProduct
+  ): Product {
+    return {
+      slug: genProductSlug({ handle: product.handle, storeDomain: this.storeDomain }),
+      handle: product.handle,
+      platformId: product.id.toString(),
+      title: product.title,
+      available: product.available,
+      price: product.price, // Already in correct format (cents as integer)
+      priceMin: product.price_min, // Already in correct format (cents as integer)
+      priceMax: product.price_max, // Already in correct format (cents as integer)
+      priceVaries: product.price_varies,
+      compareAtPrice: product.compare_at_price || 0, // Already in correct format (cents as integer)
+      compareAtPriceMin: product.compare_at_price_min, // Already in correct format (cents as integer)
+      compareAtPriceMax: product.compare_at_price_max, // Already in correct format (cents as integer)
+      compareAtPriceVaries: product.compare_at_price_varies,
+      discount: 0, // Calculate if needed
+      currency: 'USD', // Default or extract from store
+      options: product.options.map(option => ({
+        key: option.name.toLowerCase().replace(/\s+/g, '_'),
+        data: option.values,
+        name: option.name,
+        position: option.position,
+        values: option.values
+      })),
+      bodyHtml: product.description || null,
+      active: true,
+      productType: product.type || null,
+      tags: Array.isArray(product.tags) ? product.tags : typeof product.tags === 'string' ? [product.tags] : [],
+      vendor: product.vendor,
+      featuredImage: this.normalizeImageUrl(product.featured_image),
+      isProxyFeaturedImage: false,
+      createdAt: new Date(product.created_at),
+      updatedAt: new Date(product.updated_at),
+      variants: product.variants.map(variant => ({
+        id: variant.id.toString(),
+        platformId: variant.id.toString(),
+        name: undefined, // ShopifySingleProductVariant doesn't have name property
+        title: variant.title,
+        option1: variant.option1,
+        option2: variant.option2,
+        option3: variant.option3,
+        options: [variant.option1, variant.option2, variant.option3].filter(Boolean) as string[],
+        sku: variant.sku,
+        requiresShipping: variant.requires_shipping,
+        taxable: variant.taxable,
+        featuredImage: variant.featured_image ? {
+          id: variant.featured_image.id,
+          src: variant.featured_image.src,
+          width: variant.featured_image.width,
+          height: variant.featured_image.height,
+          position: variant.featured_image.position,
+          productId: variant.featured_image.product_id,
+          aspectRatio: variant.featured_image.aspect_ratio || 0,
+          variantIds: variant.featured_image.variant_ids,
+          createdAt: variant.featured_image.created_at,
+          updatedAt: variant.featured_image.updated_at,
+          alt: variant.featured_image.alt
+        } : null,
+        available: variant.available || false,
+        price: typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price, // Already in correct format (cents as integer)
+        weightInGrams: variant.grams,
+        compareAtPrice: typeof variant.compare_at_price === 'string' ? parseFloat(variant.compare_at_price || '0') : (variant.compare_at_price || 0), // Already in correct format (cents as integer)
+        position: variant.position,
+        productId: variant.product_id,
+        createdAt: variant.created_at,
+        updatedAt: variant.updated_at
+      })),
+      images: Array.isArray(product.images) ? product.images.map((imageSrc, index) => ({
+        id: index + 1,
+        productId: product.id,
+        alt: null,
+        position: index + 1,
+        src: this.normalizeImageUrl(imageSrc),
+        width: 0,
+        height: 0,
+        mediaType: 'image' as const,
+        variantIds: [],
+        createdAt: product.created_at,
+        updatedAt: product.updated_at
+      })) : [],
+      publishedAt: new Date(product.published_at),
+      seo: null,
+      metaTags: null,
+      displayScore: undefined,
+      deletedAt: null,
+      storeSlug: this.storeDomain,
+      storeDomain: this.storeDomain,
+      url: product.url || `${this.storeDomain}/products/${product.handle}`
+    };
+  }
+
+  collectionsDto(
+    collections: ShopifyCollection[]
+  ): Collection[] {
     return collections.map((collection) => ({
       id: collection.id.toString(),
       title: collection.title,
       handle: collection.handle,
       description: collection.description,
+      image: collection.image ? {
+        id: collection.image.id,
+        createdAt: collection.image.created_at,
+        src: collection.image.src,
+        alt: collection.image.alt
+      } : undefined,
       productsCount: collection.products_count,
       publishedAt: collection.published_at,
-      updatedAt: collection.updated_at,
-      image: collection.image ? {
-        id: collection.image?.id,
-        createdAt: collection.image?.created_at,
-        src: collection.image?.src,
-        alt: collection.image?.alt,
-      } : undefined,
+      updatedAt: collection.updated_at
     }));
   }
 
-  private async fetchProducts(page: number, limit: number): Promise<Product[] | null> {
+  /**
+   * Enhanced error handling with context
+   */
+  private handleFetchError(
+    error: unknown,
+    context: string,
+    url: string,
+  ): never {
+    let errorMessage = `Error ${context}`;
+    let statusCode: number | undefined;
+
+    if (error instanceof Error) {
+      errorMessage += `: ${error.message}`;
+      
+      // Check if it's a fetch error with response
+      if ('status' in error) {
+        statusCode = error.status as number;
+      }
+    } else if (typeof error === 'string') {
+      errorMessage += `: ${error}`;
+    } else {
+      errorMessage += ': Unknown error occurred';
+    }
+
+    // Add URL context for debugging
+    errorMessage += ` (URL: ${url})`;
+
+    // Add status code if available
+    if (statusCode) {
+      errorMessage += ` (Status: ${statusCode})`;
+    }
+
+    // Create enhanced error with additional properties
+    const enhancedError = new Error(errorMessage);
+    (enhancedError as any).context = context;
+    (enhancedError as any).url = url;
+    (enhancedError as any).statusCode = statusCode;
+    (enhancedError as any).originalError = error;
+
+    throw enhancedError;
+  }
+
+  /**
+   * Fetch products with pagination
+   */
+  private async fetchProducts(
+    page: number,
+    limit: number,
+  ): Promise<Product[] | null> {
     try {
-      const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
+      const url = `${this.baseUrl}products.json?page=${page}&limit=${limit}`;
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = (await response.json()) as {
-        products: ShopifyProduct[];
-      };
-      // urlPath = extractDomainWithoutSuffix(this.storeDomain); // No longer needed to reassign urlPath
-      const productsData = this.productsDto(data.products);
-      return productsData;
+      const data: { products: ShopifyProduct[] } = await response.json();
+      return this.productsDto(data.products);
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(
-          `Error fetching page ${page}:`,
-          this.baseUrl,
-          error.message
-        );
-      }
-      throw error;
-    }
-  };
-
-  private async fetchCollections(page: number, limit: number): Promise<Collection[] | null> {
-    try {
-      const url = `${this.baseUrl}collections.json?limit=${limit}&page=${page}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = (await response.json()) as {
-        collections: ShopifyCollection[];
-      };
-      const collectionsData = this.collectionsDto(data.collections);
-      return collectionsData;
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error(
-          `Error fetching page ${page}:`,
-          this.baseUrl,
-          error.message
-        );
-      }
-      throw error;
-    }
-  };
-
-  public store = {
-    info: async () => {
-      try {
-        const response = await fetch(this.baseUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const html = await response.text();
-
-        const getMetaTag = (name: string) => {
-          const regex = new RegExp(`<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`);
-          const match = html.match(regex);
-          return match ? match[1] : null;
-        };
-
-        const getPropertyMetaTag = (property: string) => {
-          const regex = new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`);
-          const match = html.match(regex);
-          return match ? match[1] : null;
-        }
-
-        const title = getMetaTag("og:title") || getMetaTag("twitter:title");
-
-        const description = getMetaTag("description") || getPropertyMetaTag("og:description");
-
-        const shopifyWalletId = getMetaTag("shopify-digital-wallet")?.split("/")[1];
-
-        const myShopifySubdomainMatch = html.match(/['"](.*?\.myshopify\.com)['"]/);
-        const myShopifySubdomain = myShopifySubdomainMatch ? myShopifySubdomainMatch[1] : null;
-
-        let logoUrl = getPropertyMetaTag("og:image") || getPropertyMetaTag("og:image:secure_url");
-        if (!logoUrl) {
-          const logoMatch = html.match(/<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/);
-          logoUrl = logoMatch ? logoMatch[1].replace('http://', 'https://') : null;
-        } else {
-          logoUrl = logoUrl.replace('http://', 'https://');
-        }
-
-        const socialLinks: Record<string, string> = {};
-        const socialRegex = /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
-        let socialMatch;
-        while ((socialMatch = socialRegex.exec(html)) !== null) {
-          const url = new URL(socialMatch[1]);
-          const domain = url.hostname.replace("www.", "").split('.')[0];
-          if (domain) {
-            socialLinks[domain] = socialMatch[1];
-          }
-        }
-
-        const contactLinks = {
-          tel: null as string | null,
-          email: null as string | null,
-          contactPage: null as string | null
-        };
-        
-        const contactRegex = new RegExp('<a[^>]+href=["\']((?:mailto:|tel:)[^"\']*|[^"\']*(?:\\/contact|\\/pages\\/contact)[^"\']*)["\']', 'g');
-        let contactMatch;
-        while ((contactMatch = contactRegex.exec(html)) !== null) {
-          const link = contactMatch[1];
-          if (link.startsWith('tel:')) {
-            contactLinks.tel = link.replace("tel:", "").trim();
-          } else if (link.startsWith('mailto:')) {
-            contactLinks.email = link.replace("mailto:", "").trim();
-          } else if (link.includes('/contact') || link.includes('/pages/contact')) {
-            contactLinks.contactPage = link;
-          }
-        }
-
-        const homePageProductLinks = html.match(/href=["']([^"']*\/products\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
-        const homePageCollectionLinks = html.match(/href=["']([^"']*\/collections\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
-        // const homePagePageLinks = html.match(/href=["']([^"']*\/pages\/[^"']+)["']/g)?.map(match => match.split('href=')[1].replace(/['"]/g, '').split("/").at(-1));
-
-        const jsonLd = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g)?.map(match => match.split('>')[1].replace(/<\/script/g, ''));
-        const jsonLdData = jsonLd?.map(json => JSON.parse(json));
-
-        return {
-          title,
-          description,
-          shopifyWalletId,
-          myShopifySubdomain,
-          logoUrl,
-          socialLinks,
-          contactLinks,
-          showcase: {
-            products: unique(homePageProductLinks ?? []),
-            collections: unique(homePageCollectionLinks ?? [])
-          },
-          jsonLdData
-        };
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(`Error fetching store info:`, this.baseUrl, error.message);
-        }
-        throw error;
-      }
+      this.handleFetchError(error, "fetching products", `${this.baseUrl}products.json`);
     }
   }
 
-  public products = {
-    all: async (): Promise<Product[] | null> => {
-      const limit = 250;
-      let allProducts: Product[] = [];
+  /**
+   * Fetch collections with pagination
+   */
+  private async fetchCollections(page: number, limit: number) {
+    try {
+      const url = `${this.baseUrl}collections.json?page=${page}&limit=${limit}`;
+      const response = await fetch(url);
 
-      async function fetchAll(this: Store) {
-        let currentPage = 1;
-
-        while (true) {
-          const products = await this.fetchProducts.call(this, currentPage, limit);
-
-          if (!products || products.length === 0 || products.length < limit) {
-            if (products && products.length > 0) {
-              allProducts = [...allProducts, ...products];
-            }
-            break;
-          }
-
-          allProducts = [...allProducts, ...products];
-          currentPage++;
-        }
-        return allProducts;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      try {
-        // Bind `this` for fetchAll if it uses `this.productsDto`
-        const products = await fetchAll.call(this);
-        return products;
-      } catch (error) {
-        console.error("Failed to fetch all products:", this.storeDomain, error);
-        throw error;
-      }
-    },
-    paginated: async (options?: {
-      page?: number;
-      limit?: number;
-    }): Promise<Product[] | null> => {
-      const page = options?.page ?? 1;
-      const limit = Math.min(options?.limit ?? 250, 250);
-      const url = `${this.baseUrl}products.json?limit=${limit}&page=${page}`;
-
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          console.error(
-            `HTTP error! status: ${response.status} for ${this.storeDomain} page ${page}`
-          );
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        // Corrected type assertion to match the 'all' method's 'fetchPage' function
-        const data = (await response.json()) as {
-          products: ShopifyProduct[];
-        };
-        if (data.products.length === 0) {
-          return []; // No products on this page or end of products
-        }
-        return this.productsDto(data.products);
-      } catch (error) {
-        console.error(
-          `Error fetching products for ${this.storeDomain} page ${page} with limit ${limit}:`,
-          error
-        );
-        return null;
-      }
-    },
-
-    find: async (productHandle: string): Promise<Product | null> => {
-      try {
-        const url = `${this.baseUrl}products/${productHandle}.js`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const product = (await response.json()) as ShopifySingleProduct;
-        const productData = this.productDto(product);
-        return productData;
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(
-            `Error fetching product ${productHandle}:`,
-            this.baseUrl,
-            error.message
-          );
-        }
-        throw error;
-      }
-    },
-  };
-
-  public collections = {
-    all: async (): Promise<Collection[]> => {
-      const limit = 250;
-      let allCollections: Collection[] = [];
-
-      async function fetchAll(this: Store) {
-        let currentPage = 1;
-
-        while (true) {
-          const collections = await this.fetchCollections.call(this, currentPage, limit);
-
-          if (!collections || collections.length === 0 || collections.length < limit) {
-            if (!collections) {
-              console.warn("fetchCollections returned null, treating as empty array.");
-              break;
-            }
-            if (collections && collections.length > 0) {
-              allCollections = [...allCollections, ...collections];
-            }
-            break;
-          }
-
-          allCollections = [...allCollections, ...collections];
-          currentPage++;
-        }
-        return allCollections;
-      }
-
-      try {
-        // Bind `this` for fetchAll if it uses `this.collectionsDto`
-        const collections = await fetchAll.call(this);
-        return collections || [];
-      } catch (error) {
-        console.error("Failed to fetch all collections:", this.storeDomain, error);
-        throw error;
-      }
-    },
-    find: async (collectionHandle: string): Promise<Collection | null> => {
-      try {
-        const url = `${this.baseUrl}collections/${collectionHandle}.js`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const collection = (await response.json()) as ShopifyCollection;
-        const collectionData = this.collectionsDto([collection]);
-        return collectionData[0] || null;
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(
-            `Error fetching collection ${collectionHandle}:`,
-            this.baseUrl,
-            error.message
-          );  
-        }
-        throw error;
-      }
-    },
-    products: {
-      paginated: async (collectionHandle: string, options?: {
-        page?: number;
-        limit?: number;
-      }): Promise<Product[] | null> => {
-        try {
-          const page = options?.page ?? 1;
-          const limit = Math.min(options?.limit ?? 250, 250);
-          const url = `${this.baseUrl}collections/${collectionHandle}/products.json?limit=${limit}&page=${page}`;
-          const response = await fetch(url);
-
-          if (!response.ok) {
-            console.error(
-              `HTTP error! status: ${response.status} for ${this.storeDomain} collection ${collectionHandle}`
-            );
-            return null;
-          }
-          const products = (await response.json()) as {
-            products: ShopifyProduct[];
-          };
-          const productsData = this.productsDto(products.products);
-          return productsData;
-        } catch (error) {
-          if (error instanceof Error) {
-            console.error(
-              `Error fetching products for collection ${collectionHandle}:`,
-              this.baseUrl,
-              error.message
-            );
-          }
-          throw error;
-        }
-      },
-      all: async (collectionHandle: string): Promise<Product[] | null> => {
-        try {
-          const limit = 250;
-          let allProducts: Product[] = [];
-
-          async function fetchAll(this: Store) {
-            let currentPage = 1;
-
-            while (true) {
-              const products = await this.fetchProducts.call(this, currentPage, limit);
-              if (!products || products.length === 0 || products.length < limit) {
-                if (products && products.length > 0) {
-                  allProducts = [...allProducts, ...products];
-                }
-                break;
-              }
-              allProducts = [...allProducts, ...products];
-              currentPage++;
-            }
-            return allProducts;
-          }
-
-          try {
-            // Bind `this` for fetchAll if it uses `this.productsDto`
-            const products = await fetchAll.call(this);
-            return products || [];
-          } catch (error) {
-            console.error(
-              `Error fetching all products for collection ${collectionHandle}:`,
-              this.baseUrl,
-              error
-            );
-            return null;
-          }
-        } catch (error) {
-          console.error(
-            `Error fetching all products for collection ${collectionHandle}:`,
-            this.baseUrl,
-            error
-          );
-          return null;
-        }
-      },
+      const data = await response.json();
+      return this.collectionsDto(data.collections);
+    } catch (error) {
+      this.handleFetchError(
+        error,
+        "fetching collections",
+        `${this.baseUrl}collections.json`,
+      );
     }
-  };
+  }
+
+  /**
+   * Fetch paginated products from a specific collection
+   */
+  private async fetchPaginatedProductsFromCollection(
+    collectionHandle: string,
+    options: { page?: number; limit?: number } = {},
+  ) {
+    try {
+      const { page = 1, limit = 250 } = options;
+      const url = `${this.baseUrl}collections/${collectionHandle}/products.json?page=${page}&limit=${limit}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // Collection not found
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data: { products: ShopifyProduct[] } = await response.json();
+      return this.productsDto(data.products);
+    } catch (error) {
+      this.handleFetchError(
+        error,
+        "fetching products from collection",
+        `${this.baseUrl}collections/${collectionHandle}/products.json`,
+      );
+    }
+  }
+
+  /**
+   * Validate if a product exists (with caching)
+   */
+  private async validateProductExists(handle: string): Promise<boolean> {
+    const cacheKey = `product:${handle}`;
+    
+    if (this.isCacheValid(cacheKey)) {
+      return this.validationCache.get(cacheKey) || false;
+    }
+
+    try {
+      const url = `${this.baseUrl}products/${handle}.js`;
+      const response = await fetch(url, { method: 'HEAD' });
+      const exists = response.ok;
+      
+      this.setCacheValue(cacheKey, exists);
+      return exists;
+    } catch (error) {
+      this.setCacheValue(cacheKey, false);
+      return false;
+    }
+  }
+
+  /**
+   * Validate if a collection exists (with caching)
+   */
+  private async validateCollectionExists(handle: string): Promise<boolean> {
+    const cacheKey = `collection:${handle}`;
+    
+    if (this.isCacheValid(cacheKey)) {
+      return this.validationCache.get(cacheKey) || false;
+    }
+
+    try {
+      const url = `${this.baseUrl}collections/${handle}.js`;
+      const response = await fetch(url, { method: 'HEAD' });
+      const exists = response.ok;
+      
+      this.setCacheValue(cacheKey, exists);
+      return exists;
+    } catch (error) {
+      this.setCacheValue(cacheKey, false);
+      return false;
+    }
+  }
+
+  /**
+   * Check if cache entry is still valid
+   */
+  private isCacheValid(key: string): boolean {
+    const timestamp = this.cacheTimestamps.get(key);
+    if (!timestamp) return false;
+    
+    return Date.now() - timestamp < this.cacheExpiry;
+  }
+
+  /**
+   * Set cache value with timestamp
+   */
+  private setCacheValue(key: string, value: boolean): void {
+    this.validationCache.set(key, value);
+    this.cacheTimestamps.set(key, Date.now());
+  }
+
+  /**
+   * Validate links in batches to avoid overwhelming the server
+   */
+  private async validateLinksInBatches<T>(
+    items: T[],
+    validator: (item: T) => Promise<boolean>,
+    batchSize: number = 10,
+  ): Promise<T[]> {
+    const validItems: T[] = [];
+    
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const validationPromises = batch.map(async (item) => {
+        const isValid = await validator(item);
+        return isValid ? item : null;
+      });
+      
+      const results = await Promise.all(validationPromises);
+      const validBatchItems = results.filter((item): item is NonNullable<typeof item> => item !== null);
+      validItems.push(...validBatchItems);
+      
+      // Add small delay between batches to be respectful
+      if (i + batchSize < items.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return validItems;
+  }
+
+  /**
+   * Fetches comprehensive store information including metadata, social links, and showcase content.
+   * 
+   * @returns {Promise<StoreInfo>} Store information object containing:
+   * - `name` - Store name from meta tags or domain
+   * - `domain` - Store domain URL
+   * - `slug` - Generated store slug
+   * - `title` - Store title from meta tags
+   * - `description` - Store description from meta tags
+   * - `logoUrl` - Store logo URL from Open Graph or CDN
+   * - `socialLinks` - Object with social media links (facebook, twitter, instagram, etc.)
+   * - `contactLinks` - Object with contact information (tel, email, contactPage)
+   * - `headerLinks` - Array of navigation links from header
+   * - `showcase` - Object with featured products and collections from homepage
+   * - `jsonLdData` - Structured data from JSON-LD scripts
+   * - `techProvider` - Shopify-specific information (walletId, subDomain)
+   * - `countryDetection` - Country detection results with confidence score and signals. Returns ISO 3166-1 alpha-2 codes (e.g., "US", "GB")
+   * 
+   * @throws {Error} When the store URL is unreachable or returns an error
+   * 
+   * @example
+   * ```typescript
+   * const shop = new ShopClient('https://example.myshopify.com');
+   * const storeInfo = await shop.getInfo();
+   * 
+   * console.log(storeInfo.name); // "Example Store"
+   * console.log(storeInfo.socialLinks.instagram); // "https://instagram.com/example"
+   * console.log(storeInfo.showcase.products); // ["product-handle-1", "product-handle-2"]
+   * console.log(storeInfo.countryDetection.country); // "US" (ISO code)
+   * console.log(storeInfo.countryDetection.confidence); // 0.85
+   * ```
+   */
+  async getInfo(): Promise<StoreInfo> {
+    try {
+      const response = await fetch(this.baseUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const html = await response.text();
+
+      const getMetaTag = (name: string) => {
+        const regex = new RegExp(
+          `<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`,
+        );
+        const match = html.match(regex);
+        return match ? match[1] : null;
+      };
+
+      const getPropertyMetaTag = (property: string) => {
+        const regex = new RegExp(
+          `<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`,
+        );
+        const match = html.match(regex);
+        return match ? match[1] : null;
+      };
+
+      const name =
+        getMetaTag("og:site_name") ??
+        extractDomainWithoutSuffix(this.baseUrl);
+      const title = getMetaTag("og:title") ?? getMetaTag("twitter:title");
+
+      const description =
+        getMetaTag("description") || getPropertyMetaTag("og:description");
+
+      const shopifyWalletId = getMetaTag("shopify-digital-wallet")?.split(
+        "/",
+      )[1];
+
+      const myShopifySubdomainMatch = html.match(
+        /['"](.*?\.myshopify\.com)['"]/,
+      );
+      const myShopifySubdomain = myShopifySubdomainMatch
+        ? myShopifySubdomainMatch[1]
+        : null;
+
+      let logoUrl =
+        getPropertyMetaTag("og:image") ||
+        getPropertyMetaTag("og:image:secure_url");
+      if (!logoUrl) {
+        const logoMatch = html.match(
+          /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/,
+        );
+        logoUrl = logoMatch
+          ? logoMatch[1].replace("http://", "https://")
+          : null;
+      } else {
+        logoUrl = logoUrl.replace("http://", "https://");
+      }
+
+      const socialLinks: Record<string, string> = {};
+      const socialRegex =
+        /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
+      let socialMatch;
+      while ((socialMatch = socialRegex.exec(html)) !== null) {
+        const url = new URL(socialMatch[1]);
+        const domain = url.hostname.replace("www.", "").split(".")[0];
+        if (domain) {
+          socialLinks[domain] = socialMatch[1];
+        }
+      }
+
+      const contactLinks = {
+        tel: null as string | null,
+        email: null as string | null,
+        contactPage: null as string | null,
+      };
+
+      const contactRegex = new RegExp(
+        "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
+        "g",
+      );
+      let contactMatch;
+      while ((contactMatch = contactRegex.exec(html)) !== null) {
+        const link = contactMatch[1];
+        if (link.startsWith("tel:")) {
+          contactLinks.tel = link.replace("tel:", "").trim();
+        } else if (link.startsWith("mailto:")) {
+          contactLinks.email = link.replace("mailto:", "").trim();
+        } else if (
+          link.includes("/contact") ||
+          link.includes("/pages/contact")
+        ) {
+          contactLinks.contactPage = link;
+        }
+      }
+
+      const extractedProductLinks =
+        html
+          .match(/href=["']([^"']*\/products\/[^"']+)["']/g)
+          ?.map((match) =>
+            match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1),
+          )
+          ?.filter(Boolean) || [];
+
+      const extractedCollectionLinks =
+        html
+          .match(/href=["']([^"']*\/collections\/[^"']+)["']/g)
+          ?.map((match) =>
+            match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1),
+          )
+          ?.filter(Boolean) || [];
+
+      // Validate links in batches for better performance
+      const [homePageProductLinks, homePageCollectionLinks] =
+        await Promise.all([
+          this.validateLinksInBatches(
+            extractedProductLinks.filter((handle): handle is string =>
+              Boolean(handle),
+            ),
+            (handle) => this.validateProductExists(handle),
+          ),
+          this.validateLinksInBatches(
+            extractedCollectionLinks.filter((handle): handle is string =>
+              Boolean(handle),
+            ),
+            (handle) => this.validateCollectionExists(handle),
+          ),
+        ]);
+
+      const jsonLd = html
+        .match(
+          /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g,
+        )
+        ?.map((match) => match.split(">")[1].replace(/<\/script/g, ""));
+      const jsonLdData = jsonLd?.map((json) => JSON.parse(json));
+
+      const headerLinks =
+        html
+          .match(
+            /<(header|nav|div|section)\b[^>]*\b(?:id|class)=["'][^"']*(?=.*shopify-section)(?=.*\b(header|navigation|nav|menu)\b)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,
+          )
+          ?.flatMap((header) => {
+            const links = header
+              .match(/href=["']([^"']+)["']/g)
+              ?.filter(
+                (link) =>
+                  link.includes("/products/") ||
+                  link.includes("/collections/") ||
+                  link.includes("/pages/"),
+              );
+            return (
+              links
+                ?.map((link) => {
+                  const href = link.match(/href=["']([^"']+)["']/)?.[1];
+                  if (
+                    href &&
+                    !href.startsWith("#") &&
+                    !href.startsWith("javascript:")
+                  ) {
+                    try {
+                      const url = new URL(href, this.storeDomain);
+                      return url.pathname.replace(/^\/|\/$/g, "");
+                    } catch {
+                      return href.replace(/^\/|\/$/g, "");
+                    }
+                  }
+                  return null;
+                })
+                .filter((item): item is string => Boolean(item)) ?? []
+            );
+          }) ?? [];
+      
+      const slug = generateStoreSlug(this.baseUrl)
+
+      // Detect country information
+      const countryDetection = await detectShopifyCountry(html);
+
+      return {
+        name: name || slug,
+        domain: this.baseUrl,
+        slug,
+        title,
+        description,
+        logoUrl,
+        socialLinks,
+        contactLinks,
+        headerLinks,
+        showcase: {
+          products: unique(homePageProductLinks ?? []),
+          collections: unique(homePageCollectionLinks ?? []),
+        },
+        jsonLdData,
+        techProvider: {
+          name: "shopify",
+          walletId: shopifyWalletId,
+          subDomain: myShopifySubdomain,
+        },
+        country: countryDetection.country,
+      };
+    } catch (error) {
+      this.handleFetchError(error, "fetching store info", this.baseUrl);
+    }
+  }
 }
-
-
-// Test script for store.info

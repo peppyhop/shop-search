@@ -2,7 +2,7 @@ import { parse } from "tldts";
 
 export function extractDomainWithoutSuffix(domain: string) {
   const parsedDomain = parse(domain);
-  return parsedDomain.hostname || domain.split("://")[1];
+  return parsedDomain.domainWithoutSuffix;
 }
 
 export function generateStoreSlug(domain: string): string {
