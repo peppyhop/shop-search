@@ -57,7 +57,7 @@ function scoreCountry(countryScores: CountryScores, country: string, weight: num
  * 
  * @example
  * ```typescript
- * const response = await fetch('https://example.myshopify.com');
+ * const response = await fetch('https://exampleshop.com');
  * const html = await response.text();
  * const result = await detectShopifyCountry(html);
  * 

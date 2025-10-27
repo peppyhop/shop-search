@@ -4,14 +4,16 @@ import { detectShopifyCountry } from "./utils/detect-country";
 import { extractDomainWithoutSuffix, generateStoreSlug } from "./utils/func";
 
 /**
- * Store operations interface for managing store-related functionality
+ * Store operations interface for managing store-related functionality.
+ * Provides methods to fetch comprehensive store information and metadata.
  */
 export interface StoreOperations {
   info(): Promise<StoreInfo>;
 }
 
 /**
- * Store information structure returned by the info method
+ * Comprehensive store information structure returned by the info method.
+ * Contains all metadata, branding, social links, and showcase content for a Shopify store.
  */
 export interface StoreInfo {
   name: string;
@@ -41,8 +43,8 @@ export interface StoreInfo {
 }
 
 /**
- * Creates store operations for a given store instance
- * @param context - Store context containing necessary methods and properties
+ * Creates store operations for a ShopClient instance.
+ * @param context - ShopClient context containing necessary methods and properties for store operations
  */
 export function createStoreOperations(context: {
   baseUrl: string;
@@ -73,17 +75,19 @@ export function createStoreOperations(context: {
      * - `showcase` - Object with featured products and collections from homepage
      * - `jsonLdData` - Structured data from JSON-LD scripts
      * - `techProvider` - Shopify-specific information (walletId, subDomain)
+     * - `country` - Country detection results with ISO 3166-1 alpha-2 codes (e.g., "US", "GB")
      * 
      * @throws {Error} When the store URL is unreachable or returns an error
      * 
      * @example
-   * ```typescript
-   * const shop = new ShopClient('https://example.myshopify.com');
-   * const storeInfo = await shop.getInfo();
-   * console.log(storeInfo);
-   * ``` * console.log(storeInfo.name); // "Example Store"
+     * ```typescript
+     * const shop = new ShopClient('https://exampleshop.com');
+     * const storeInfo = await shop.getInfo();
+     * 
+     * console.log(storeInfo.name); // "Example Store"
      * console.log(storeInfo.socialLinks.instagram); // "https://instagram.com/example"
      * console.log(storeInfo.showcase.products); // ["product-handle-1", "product-handle-2"]
+     * console.log(storeInfo.country); // "US"
      * ```
      */
     info: async (): Promise<StoreInfo> => {

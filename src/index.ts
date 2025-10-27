@@ -24,7 +24,7 @@ import {
  * ```typescript
  * import { ShopClient } from 'shop-search';
  * 
- * const shop = new ShopClient('https://your-store.myshopify.com');
+ * const shop = new ShopClient('https://exampleshop.com');
  * 
  * // Fetch all products
  * const products = await shop.products.all();
@@ -53,17 +53,21 @@ export class ShopClient {
   /**
    * Creates a new ShopClient instance for interacting with a Shopify store.
    * 
-   * @param urlPath - The Shopify store URL (e.g., 'https://your-store.myshopify.com' or 'your-store.myshopify.com')
+   * @param urlPath - The Shopify store URL (e.g., 'https://exampleshop.com' or 'exampleshop.com')
    * 
    * @throws {Error} When the URL is invalid or contains malicious patterns
    * 
    * @example
    * ```typescript
    * // With full URL
-   * const shop = new ShopClient('https://example.myshopify.com');
+   * const shop = new ShopClient('https://exampleshop.com');
    * 
    * // Without protocol (automatically adds https://)
-   * const shop = new ShopClient('example.myshopify.com');
+   * const shop = new ShopClient('exampleshop.com');
+   * 
+   * // Works with any Shopify store domain
+   * const shop1 = new ShopClient('https://example.myshopify.com');
+   * const shop2 = new ShopClient('https://boutique.fashion');
    * ```
    */
   constructor(urlPath: string) {
@@ -96,7 +100,12 @@ export class ShopClient {
       throw new Error('Invalid characters in domain name');
     }
 
-    // Ensure it's a valid domain pattern
+    // Validate domain structure - must contain at least one dot for TLD
+    if (!hostname.includes('.') || hostname.startsWith('.') || hostname.endsWith('.')) {
+      throw new Error('Invalid domain format - must be a valid domain with TLD');
+    }
+
+    // Check for valid domain pattern (basic regex)
     const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     if (!domainPattern.test(hostname)) {
       throw new Error('Invalid domain format');
@@ -623,20 +632,19 @@ export class ShopClient {
    * - `showcase` - Object with featured products and collections from homepage
    * - `jsonLdData` - Structured data from JSON-LD scripts
    * - `techProvider` - Shopify-specific information (walletId, subDomain)
-   * - `countryDetection` - Country detection results with confidence score and signals. Returns ISO 3166-1 alpha-2 codes (e.g., "US", "GB")
+   * - `country` - Country detection results with ISO 3166-1 alpha-2 codes (e.g., "US", "GB")
    * 
    * @throws {Error} When the store URL is unreachable or returns an error
    * 
    * @example
    * ```typescript
-   * const shop = new ShopClient('https://example.myshopify.com');
+   * const shop = new ShopClient('https://exampleshop.com');
    * const storeInfo = await shop.getInfo();
    * 
    * console.log(storeInfo.name); // "Example Store"
    * console.log(storeInfo.socialLinks.instagram); // "https://instagram.com/example"
    * console.log(storeInfo.showcase.products); // ["product-handle-1", "product-handle-2"]
-   * console.log(storeInfo.countryDetection.country); // "US" (ISO code)
-   * console.log(storeInfo.countryDetection.confidence); // 0.85
+   * console.log(storeInfo.country); // "US"
    * ```
    */
   async getInfo(): Promise<StoreInfo> {
@@ -841,3 +849,66 @@ export class ShopClient {
     }
   }
 }
+
+// Export all types for external use
+export type {
+  // Core product and collection types
+  Product,
+  Collection,
+  ProductVariant,
+  ProductImage,
+  ProductOption,
+  ProductPricing,
+  ProductVariantImage,
+  MetaTag,
+  
+  // Shopify API types
+  ShopifyProduct,
+  ShopifyCollection,
+  ShopifySingleProduct,
+  ShopifyProductVariant,
+  ShopifySingleProductVariant,
+  ShopifyImage,
+  ShopifyVariantImage,
+  ShopifyFeaturedMedia,
+  ShopifyMedia,
+  ShopifyOption,
+  ShopifyBaseVariant,
+  ShopifyBaseProduct,
+  ShopifyApiProduct,
+  ShopifyPredictiveProductSearch,
+  ShopifyTimestamps,
+  ShopifyBasicInfo,
+  ShopifyImageDimensions,
+  ShopifyFeaturesData,
+  
+  // Store and catalog types
+  StoreCatalog,
+  CatalogCategory,
+  Demographics,
+  ValidStoreCatalog,
+  Address,
+  ContactUrls,
+  Coupon,
+  
+  // Country detection types
+  CountryDetectionResult,
+  CountryScore,
+  CountryScores,
+} from "./types";
+
+// Export operation interfaces
+export type { ProductOperations } from "./products";
+export type { CollectionOperations } from "./collections";
+export type { CheckoutOperations } from "./checkout";
+export type { StoreOperations, StoreInfo } from "./store";
+
+// Export utility functions
+export {
+  extractDomainWithoutSuffix,
+  generateStoreSlug,
+  genProductSlug,
+  calculateDiscount,
+} from "./utils/func";
+
+export { detectShopifyCountry } from "./utils/detect-country";

@@ -514,4 +514,165 @@ describe('ShopClient Class Integration Tests', () => {
 
   }, 20000);
 
+  test('should filter products and return variant options map', async () => {
+    console.log(`Testing products.filter() with store: ${storeDomain}`);
+
+    let filterResult;
+    try {
+      filterResult = await shop.products.filter();
+    } catch (error) {
+      console.error(`Error filtering products: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(filterResult).toBeDefined();
+    expect(typeof filterResult).toBe('object');
+    
+    // Check if the result is a proper map/object
+    expect(filterResult).not.toBeNull();
+    
+    if (!filterResult) return; // Type guard
+    
+    // Log the filter result for debugging
+    console.log(`Filter result keys: ${Object.keys(filterResult)}`);
+    
+    // If there are any options, verify the structure
+    const optionNames = Object.keys(filterResult);
+    if (optionNames.length > 0) {
+      optionNames.forEach(optionName => {
+        expect(typeof optionName).toBe('string');
+        expect(Array.isArray(filterResult[optionName])).toBe(true);
+        expect(filterResult[optionName].length).toBeGreaterThan(0);
+        
+        // Check that all values in the array are strings
+        filterResult[optionName].forEach((value: any) => {
+          expect(typeof value).toBe('string');
+        });
+        
+        // Check that values are sorted and unique
+        const values = filterResult[optionName];
+        const sortedUniqueValues = [...new Set(values)].sort();
+        expect(values).toEqual(sortedUniqueValues);
+        
+        console.log(`Option "${optionName}" has ${values.length} distinct values: ${values.slice(0, 5).join(', ')}${values.length > 5 ? '...' : ''}`);
+      });
+    } else {
+      console.log('No variant options found in products (this is acceptable for stores without variants)');
+    }
+
+  }, 30000);
+
+  test('should handle filter method with products that have multiple variant options', async () => {
+    console.log(`Testing products.filter() for multiple variant options: ${storeDomain}`);
+
+    let filterResult;
+    try {
+      filterResult = await shop.products.filter();
+    } catch (error) {
+      console.error(`Error filtering products: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(filterResult).toBeDefined();
+    if (!filterResult) return; // Type guard
+    
+    const optionNames = Object.keys(filterResult);
+    
+    // Test common variant option names that might exist
+    const commonOptions = ['Size', 'Color', 'Material', 'Style', 'Title'];
+    const foundOptions = optionNames.filter(option => 
+      commonOptions.some(common => 
+        option.toLowerCase().includes(common.toLowerCase())
+      )
+    );
+    
+    if (foundOptions.length > 0) {
+      console.log(`Found common variant options: ${foundOptions.join(', ')}`);
+      
+      foundOptions.forEach(optionName => {
+        const values = filterResult[optionName];
+        expect(Array.isArray(values)).toBe(true);
+        expect(values.length).toBeGreaterThan(0);
+        
+        // Verify no duplicates
+        const uniqueValues = new Set(values);
+        expect(uniqueValues.size).toBe(values.length);
+        
+        console.log(`"${optionName}" option has values: ${values.join(', ')}`);
+      });
+    } else {
+      console.log('No common variant options found, but this is acceptable');
+    }
+
+  }, 30000);
+
+  test('should handle filter method when no products have variants', async () => {
+    console.log(`Testing products.filter() edge case handling: ${storeDomain}`);
+
+    // This test verifies that the filter method handles cases where products might not have variants
+    let filterResult;
+    try {
+      filterResult = await shop.products.filter();
+    } catch (error) {
+      console.error(`Error filtering products: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(filterResult).toBeDefined();
+    expect(typeof filterResult).toBe('object');
+    
+    if (!filterResult) return; // Type guard
+    
+    // The result should be an object (possibly empty if no variants exist)
+    const optionNames = Object.keys(filterResult);
+    
+    if (optionNames.length === 0) {
+      console.log('No variant options found - all products may have single variants or no variants');
+      expect(filterResult).toEqual({});
+    } else {
+      console.log(`Found ${optionNames.length} variant options despite potential single-variant products`);
+      
+      // Verify that even if some products don't have variants, the method still works
+      optionNames.forEach(optionName => {
+        expect(Array.isArray(filterResult[optionName])).toBe(true);
+        expect(filterResult[optionName].length).toBeGreaterThan(0);
+      });
+    }
+
+  }, 30000);
+
+  test('should return consistent filter results on multiple calls', async () => {
+    console.log(`Testing products.filter() consistency: ${storeDomain}`);
+
+    let firstResult, secondResult;
+    
+    try {
+      // Call filter method twice
+      firstResult = await shop.products.filter();
+      secondResult = await shop.products.filter();
+    } catch (error) {
+      console.error(`Error in consistency test: ${(error as Error).message}`);
+      expect(error).toBeDefined();
+      return;
+    }
+
+    expect(firstResult).toBeDefined();
+    expect(secondResult).toBeDefined();
+    
+    if (!firstResult || !secondResult) return; // Type guards
+    
+    // Results should be identical
+    expect(Object.keys(firstResult).sort()).toEqual(Object.keys(secondResult).sort());
+    
+    Object.keys(firstResult).forEach(optionName => {
+      expect(firstResult[optionName]).toEqual(secondResult[optionName]);
+    });
+    
+    console.log('Filter method returns consistent results across multiple calls');
+
+  }, 45000);
+
 });

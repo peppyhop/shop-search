@@ -24,6 +24,11 @@ export interface ProductOperations {
    * Fetches products that are showcased/featured on the store's homepage.
    */
   showcased(): Promise<Product[]>;
+  
+  /**
+   * Creates a filter map of variant options and their distinct values from all products.
+   */
+  filter(): Promise<Record<string, string[]> | null>;
 }
 
 /**
@@ -38,7 +43,7 @@ export function createProductOperations(
   getStoreInfo: () => Promise<any>,
   findProduct: (handle: string) => Promise<Product | null>
 ): ProductOperations {
-  return {
+  const operations: ProductOperations = {
     /**
      * Fetches all products from the store across all pages.
      * 
@@ -48,7 +53,7 @@ export function createProductOperations(
      * 
      * @example
      * ```typescript
-     * const shop = new ShopClient('https://example.myshopify.com');
+     * const shop = new ShopClient('https://exampleshop.com');
      * const allProducts = await shop.products.all();
      * 
      * console.log(`Found ${allProducts?.length} products`);
@@ -155,7 +160,7 @@ export function createProductOperations(
      * 
      * @example
      * ```typescript
-     * const shop = new ShopClient('https://example.myshopify.com');
+     * const shop = new ShopClient('https://exampleshop.com');
      * 
      * // Find product by handle
      * const product = await shop.products.find('awesome-t-shirt');
@@ -228,7 +233,7 @@ export function createProductOperations(
      * 
      * @example
    * ```typescript
-   * const shop = new ShopClient('https://example.myshopify.com');
+   * const shop = new ShopClient('https://exampleshop.com');
    * const showcasedProducts = await shop.products.showcased();
    * 
    * console.log(`Found ${showcasedProducts.length} showcased products`);
@@ -246,5 +251,100 @@ export function createProductOperations(
       );
       return filter(products, isNonNullish);
     },
+
+    /**
+     * Creates a filter map of variant options and their distinct values from all products.
+     * 
+     * @returns {Promise<Record<string, string[]> | null>} Map of option names to their distinct values or null if error occurs
+     * 
+     * @throws {Error} When there's a network error or API failure
+     * 
+     * @example
+     * ```typescript
+     * const shop = new ShopClient('https://exampleshop.com');
+     * const filters = await shop.products.filter();
+     * 
+     * console.log('Available filters:', filters);
+     * // Output: { "Size": ["S", "M", "L", "XL"], "Color": ["Red", "Blue", "Green"] }
+     * 
+     * // Use filters for UI components
+     * Object.entries(filters || {}).forEach(([optionName, values]) => {
+     *   console.log(`${optionName}: ${values.join(', ')}`);
+     * });
+     * ```
+     */
+    filter: async (): Promise<Record<string, string[]> | null> => {
+      try {
+        // Use the existing all() method to get all products across all pages
+        const products = await operations.all();
+        if (!products || products.length === 0) {
+          return {};
+        }
+
+        // Create a map to store option names and their distinct values
+        const filterMap: Record<string, Set<string>> = {};
+
+        // Process each product and its variants
+        products.forEach(product => {
+          if (product.variants && product.variants.length > 0) {
+            // Process product options
+            if (product.options && product.options.length > 0) {
+              product.options.forEach(option => {
+                const lowercaseOptionName = option.name.toLowerCase();
+                if (!filterMap[lowercaseOptionName]) {
+                  filterMap[lowercaseOptionName] = new Set();
+                }
+                // Add all values from this option (converted to lowercase)
+                option.values.forEach(value => {
+                  if (value && value.trim()) {
+                    filterMap[lowercaseOptionName].add(value.trim().toLowerCase());
+                  }
+                });
+              });
+            }
+
+            // Also process individual variant options as fallback
+            product.variants.forEach(variant => {
+              if (variant.option1) {
+                const optionName = (product.options?.[0]?.name || 'Option 1').toLowerCase();
+                if (!filterMap[optionName]) {
+                  filterMap[optionName] = new Set();
+                }
+                filterMap[optionName].add(variant.option1.trim().toLowerCase());
+              }
+              
+              if (variant.option2) {
+                const optionName = (product.options?.[1]?.name || 'Option 2').toLowerCase();
+                if (!filterMap[optionName]) {
+                  filterMap[optionName] = new Set();
+                }
+                filterMap[optionName].add(variant.option2.trim().toLowerCase());
+              }
+              
+              if (variant.option3) {
+                const optionName = (product.options?.[2]?.name || 'Option 3').toLowerCase();
+                if (!filterMap[optionName]) {
+                  filterMap[optionName] = new Set();
+                }
+                filterMap[optionName].add(variant.option3.trim().toLowerCase());
+              }
+            });
+          }
+        });
+
+        // Convert Sets to sorted arrays (values are already lowercase and unique due to Set)
+        const result: Record<string, string[]> = {};
+        Object.entries(filterMap).forEach(([optionName, valueSet]) => {
+          result[optionName] = Array.from(valueSet).sort();
+        });
+
+        return result;
+      } catch (error) {
+        console.error("Failed to create product filters:", storeDomain, error);
+        throw error;
+      }
+    },
   };
+  
+  return operations;
 }

@@ -5,7 +5,7 @@
  * including Shopify API response types, normalized product/collection types, and utility types.
  * 
  * @author shop-search
- * @version 2.0.0
+ * @version 2.1.2
  */
 
 // Simplified version of RequireAtLeastOne utility type
@@ -430,7 +430,7 @@ export type ShopifyApiProduct = ShopifyBasicInfo & {
 };
 
 /**
- * Store homepage information extracted from HTML parsing.
+ * Shopify store homepage information extracted from HTML parsing.
  * @internal
  */
 type StoreHomepageInfo = {

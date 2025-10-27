@@ -64,7 +64,7 @@ export function createCollectionOperations(
      * 
      * @example
      * ```typescript
-     * const shop = new ShopClient('https://example.myshopify.com');
+     * const shop = new ShopClient('https://exampleshop.com');
      * const allCollections = await shop.collections.all();
      * 
      * console.log(`Found ${allCollections.length} collections`);
@@ -131,8 +131,10 @@ export function createCollectionOperations(
      * @example
      * ```typescript
      * const shop = new ShopClient('https://example.myshopify.com');
-     * const collection = await shop.collections.find('featured-products');
-     * console.log(collection);
+     * const collection = await shop.collections.find('summer-collection');
+     * if (collection) {
+     *   console.log(collection.title); // "Summer Collection"
+     * }
      * ```
      */
     find: async (collectionHandle: string): Promise<Collection | null> => {
@@ -218,8 +220,8 @@ export function createCollectionOperations(
      * 
      * @example
      * ```typescript
-     * const store = new Store('https://example.myshopify.com');
-     * const showcasedCollections = await store.collections.showcased();
+     * const shop = new ShopClient('https://exampleshop.com');
+     * const showcasedCollections = await shop.collections.showcased();
      * 
      * console.log(`Found ${showcasedCollections.length} showcased collections`);
      * showcasedCollections.forEach(collection => {
@@ -315,7 +317,7 @@ export function createCollectionOperations(
        * 
        * @example
        * ```typescript
-       * const shop = new ShopClient('https://example.myshopify.com');
+       * const shop = new ShopClient('https://exampleshop.com');
        * const allProducts = await shop.collections.products.all('summer-collection');
        * 
        * if (allProducts) {

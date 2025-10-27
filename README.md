@@ -125,6 +125,35 @@ const showcasedProducts = await shop.products.showcased();
 
 **Returns:** `Product[]` - Array of featured products
 
+#### `products.filter()`
+
+Creates a map of variant options and their distinct values from all products in the store. This is useful for building filter interfaces, search facets, and product option selectors.
+
+```typescript
+const filters = await shop.products.filter();
+console.log('Available filters:', filters);
+
+// Example output:
+// {
+//   "size": ["small", "medium", "large", "xl"],
+//   "color": ["black", "blue", "red", "white"],
+//   "material": ["cotton", "polyester", "wool"]
+// }
+
+// Use filters for UI components
+Object.entries(filters || {}).forEach(([optionName, values]) => {
+  console.log(`${optionName}: ${values.join(', ')}`);
+});
+```
+
+**Returns:** `Record<string, string[]> | null` - Object mapping option names to arrays of their unique values (all lowercase), or null if error occurs
+
+**Features:**
+- Processes all products across all pages automatically
+- Returns lowercase, unique values for consistency
+- Handles products with multiple variant options
+- Returns empty object `{}` if no products have variants
+
 ### Collections
 
 #### `collections.all()`

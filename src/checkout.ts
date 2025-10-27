@@ -50,7 +50,7 @@ export function createCheckoutOperations(baseUrl: string): CheckoutOperations {
      * 
      * @example
      * ```typescript
-     * const shop = new ShopClient('https://example.myshopify.com');
+     * const shop = new ShopClient('https://exampleshop.com');
      * const checkoutUrl = await shop.checkout.create([
      *   { variantId: '123', quantity: 2 },
      *   { variantId: '456', quantity: 1 }
