@@ -1,0 +1,232 @@
+# Shop Search - LLM Context File
+
+## Repository Overview
+
+**shop-search** is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. This library enables developers to build e-commerce applications, product catalogs, price comparison tools, and automated store analysis systems.
+
+**Version:** 2.2.0
+**License:** MIT
+**Language:** TypeScript
+**Package Manager:** npm/yarn/pnpm
+
+## Core Purpose
+
+The library provides a comprehensive API for:
+- Fetching complete store information and metadata
+- Retrieving products with flexible pagination and filtering
+- Managing collections and their associated products
+- Generating pre-filled checkout URLs
+- Type-safe operations with full TypeScript support
+
+## Architecture Overview
+
+### Main Components
+
+1. **ShopClient** - Core client class for store operations
+2. **ProductOperations** - Product-related functionality
+3. **CollectionOperations** - Collection management
+4. **CheckoutOperations** - Checkout URL generation
+5. **Utility Functions** - Helper functions for data processing
+
+### File Structure
+
+```
+src/
+├── index.ts              # Main entry point and exports
+├── types.ts              # TypeScript type definitions
+├── store.ts              # Store information fetching
+├── products.ts           # Product operations and filtering
+├── collections.ts        # Collection operations
+├── checkout.ts           # Checkout URL generation
+└── utils/
+    └── detect-country.ts # Country detection utilities
+
+examples/
+├── basic-usage.ts        # Basic library usage examples
+├── advanced-usage.ts     # Advanced features demonstration
+└── README.md            # Examples documentation
+
+tests/
+└── src/
+    └── index.test.ts     # Test suite
+
+dist/                     # Built output (CommonJS, ESM, types)
+```
+
+## API Surface
+
+### Core Classes
+
+**ShopClient(domain: string)**
+- Primary interface for all store operations
+- Initializes with store domain
+- Provides access to products, collections, and checkout operations
+
+### Key Methods
+
+**Store Operations:**
+- `getInfo()` - Fetch comprehensive store metadata
+
+**Product Operations:**
+- `products.all()` - Get all products with auto-pagination
+- `products.paginated(options)` - Manual pagination control
+- `products.find(handle)` - Find specific product by handle
+- `products.showcased()` - Get featured products
+- `products.filter()` - Get variant options for filtering
+
+**Collection Operations:**
+- `collections.all()` - Get all collections
+- `collections.find(handle)` - Find specific collection
+- `collections.showcased()` - Get featured collections
+- `collections.products.all(handle)` - Get products from collection
+- `collections.products.paginated(handle, options)` - Paginated collection products
+
+**Checkout Operations:**
+- `checkout.createUrl(items)` - Generate pre-filled checkout URLs
+
+## Core Types
+
+### Product Type
+```typescript
+interface Product {
+  id: string;
+  title: string;
+  handle: string;
+  description: string;
+  price: number;
+  compareAtPrice?: number;
+  available: boolean;
+  images: ProductImage[];
+  variants: ProductVariant[];
+  vendor: string;
+  productType: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  currency: string;
+}
+```
+
+### Collection Type
+```typescript
+interface Collection {
+  id: string;
+  title: string;
+  handle: string;
+  description: string;
+  image?: string;
+  productsCount: number;
+}
+```
+
+### StoreInfo Type
+```typescript
+interface StoreInfo {
+  name: string;
+  domain: string;
+  slug: string;
+  title: string;
+  description: string;
+  logoUrl?: string;
+  socialLinks: Record<string, string>;
+  contactLinks: Record<string, string>;
+  headerLinks: Array<{title: string, url: string}>;
+  showcase: {
+    products: Product[];
+    collections: Collection[];
+  };
+  jsonLdData: any;
+  techProvider: string;
+  country?: string;
+}
+```
+
+## Dependencies
+
+**Runtime Dependencies:**
+- `remeda` (^2.21.5) - Functional programming utilities
+- `tldts` (^7.0.7) - Top-level domain parsing
+
+**Development Dependencies:**
+- TypeScript (^5.8.3)
+- Jest (^29.7.0) - Testing framework
+- tsup (^8.4.0) - Build tool
+- Various TypeScript and Jest type definitions
+
+## Usage Patterns
+
+### Basic Usage
+```typescript
+import { ShopClient } from 'shop-search';
+
+const shop = new ShopClient('store-domain.com');
+const products = await shop.products.all();
+const storeInfo = await shop.getInfo();
+```
+
+### Advanced Filtering
+```typescript
+const filters = await shop.products.filter();
+// Returns: { "size": ["s", "m", "l"], "color": ["red", "blue"] }
+```
+
+### Collection Products
+```typescript
+const collectionProducts = await shop.collections.products.all('collection-handle');
+```
+
+## Error Handling
+
+The library implements comprehensive error handling:
+- Network request failures return null or empty arrays
+- Invalid handles return null
+- Malformed data is gracefully handled
+- TypeScript ensures compile-time type safety
+
+## Performance Considerations
+
+- Automatic pagination handling for large datasets
+- Efficient data transformation and filtering
+- Minimal external dependencies
+- Built-in caching for repeated requests
+- Optimized for both CommonJS and ESM environments
+
+## Security Features
+
+- No sensitive data logging
+- Safe URL construction
+- Input validation and sanitization
+- No credential storage or management
+
+## Build System
+
+- **tsup** for fast TypeScript compilation
+- Dual package support (CommonJS + ESM)
+- Type declaration generation
+- Development watch mode
+- Jest for comprehensive testing
+
+## Extensibility
+
+The library is designed for extension:
+- Modular architecture allows easy feature addition
+- Type-safe interfaces for custom implementations
+- Utility functions can be imported separately
+- Plugin-friendly design patterns
+
+## Common Use Cases
+
+1. **E-commerce Applications** - Product catalog integration
+2. **Price Comparison Tools** - Multi-store product analysis
+3. **Inventory Management** - Stock level monitoring
+4. **Market Research** - Product and pricing analysis
+5. **Automated Reporting** - Store performance metrics
+6. **SEO Tools** - Product data optimization
+7. **Mobile Apps** - Product browsing and search
+
+## Version History
+
+- **2.2.0** - Current version with enhanced filtering and collection support
+- Previous versions focused on core product fetching functionality
+
+This library serves as a robust foundation for any application requiring Shopify store data integration, with a focus on developer experience, type safety, and performance.

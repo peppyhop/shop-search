@@ -1,0 +1,534 @@
+# Shop Search - API Reference
+
+## Overview
+
+This document provides a comprehensive API reference for the `shop-search` library, designed for LLM understanding and code generation assistance.
+
+## Installation
+
+```bash
+npm install shop-search
+# or
+yarn add shop-search
+# or
+pnpm add shop-search
+```
+
+## Basic Usage
+
+```typescript
+import { ShopClient } from 'shop-search';
+
+const shop = new ShopClient('your-store-domain.com');
+```
+
+## ShopClient Class
+
+### Constructor
+
+```typescript
+new ShopClient(domain: string)
+```
+
+**Parameters:**
+- `domain` (string): The Shopify store domain (e.g., 'example.myshopify.com' or 'shop.example.com')
+
+**Returns:** ShopClient instance
+
+**Example:**
+```typescript
+const shop = new ShopClient('anuki.in');
+```
+
+### Methods
+
+#### getInfo()
+
+```typescript
+async getInfo(): Promise<StoreInfo | null>
+```
+
+Fetches comprehensive store information including metadata, social links, and featured content.
+
+**Returns:** Promise resolving to StoreInfo object or null if store not found
+
+**Example:**
+```typescript
+const storeInfo = await shop.getInfo();
+console.log(storeInfo?.name); // Store name
+console.log(storeInfo?.description); // Store description
+```
+
+## ProductOperations
+
+Access via `shop.products`
+
+### all()
+
+```typescript
+async all(): Promise<Product[] | null>
+```
+
+Fetches all products from the store with automatic pagination handling.
+
+**Returns:** Promise resolving to array of Product objects or null on error
+
+**Example:**
+```typescript
+const products = await shop.products.all();
+if (products) {
+  console.log(`Found ${products.length} products`);
+}
+```
+
+### paginated()
+
+```typescript
+async paginated(options?: PaginationOptions): Promise<Product[] | null>
+```
+
+Fetches products with manual pagination control.
+
+**Parameters:**
+- `options` (PaginationOptions, optional):
+  - `limit?: number` - Number of products per page (default: 250)
+  - `page?: number` - Page number to fetch (default: 1)
+
+**Returns:** Promise resolving to array of Product objects or null on error
+
+**Example:**
+```typescript
+const firstPage = await shop.products.paginated({ limit: 10, page: 1 });
+const secondPage = await shop.products.paginated({ limit: 10, page: 2 });
+```
+
+### find()
+
+```typescript
+async find(handle: string): Promise<Product | null>
+```
+
+Finds a specific product by its handle (URL-friendly identifier).
+
+**Parameters:**
+- `handle` (string): The product handle
+
+**Returns:** Promise resolving to Product object or null if not found
+
+**Example:**
+```typescript
+const product = await shop.products.find('awesome-t-shirt');
+if (product) {
+  console.log(product.title);
+  console.log(`$${product.price / 100}`); // Convert cents to dollars
+}
+```
+
+### showcased()
+
+```typescript
+async showcased(): Promise<Product[] | null>
+```
+
+Fetches products featured on the store's homepage.
+
+**Returns:** Promise resolving to array of featured Product objects or null on error
+
+**Example:**
+```typescript
+const featuredProducts = await shop.products.showcased();
+```
+
+### filter()
+
+```typescript
+async filter(): Promise<Record<string, string[]> | null>
+```
+
+Extracts available filter options from all product variants (e.g., sizes, colors).
+
+**Returns:** Promise resolving to object with filter options or null on error
+
+**Example:**
+```typescript
+const filters = await shop.products.filter();
+// Returns: { "Size": ["S", "M", "L"], "Color": ["Red", "Blue", "Green"] }
+```
+
+## CollectionOperations
+
+Accessed via `shop.collections`
+
+### `all(): Promise<Collection[]>`
+
+Fetches all collections from the store.
+
+**Returns:** Array of all collections
+
+**Example:**
+```typescript
+const collections = await shop.collections.all();
+console.log(`Store has ${collections.length} collections`);
+```
+
+### `find(handle: string): Promise<Collection | null>`
+
+Finds a specific collection by its handle.
+
+**Parameters:**
+- `handle: string` - Collection handle (URL slug)
+
+**Returns:** Collection object or null if not found
+
+**Example:**
+```typescript
+const collection = await shop.collections.find('summer-collection');
+if (collection) {
+  console.log(`${collection.title} has ${collection.productsCount} products`);
+}
+```
+
+### `showcased(): Promise<Collection[]>`
+
+Fetches collections that are showcased/featured on the store's homepage.
+
+**Returns:** Array of showcased collections
+
+**Example:**
+```typescript
+const featuredCollections = await shop.collections.showcased();
+```
+
+### Collection Products
+
+#### `products.all(collectionHandle: string): Promise<Product[] | null>`
+
+Fetches all products from a specific collection.
+
+**Parameters:**
+- `collectionHandle: string` - Collection handle
+
+**Returns:** Array of products in the collection
+
+**Example:**
+```typescript
+const products = await shop.collections.products.all('summer-collection');
+```
+
+#### `products.paginated(collectionHandle: string, options?: PaginationOptions): Promise<Product[] | null>`
+
+Fetches products from a collection with pagination.
+
+**Parameters:**
+- `collectionHandle: string` - Collection handle
+- `options.page?: number` - Page number
+- `options.limit?: number` - Items per page
+
+**Returns:** Array of products for the specified page
+
+**Example:**
+```typescript
+const products = await shop.collections.products.paginated('summer-collection', {
+  page: 1,
+  limit: 20
+});
+```
+
+## CheckoutOperations
+
+Accessed via `shop.checkout`
+
+### `createUrl(params: CheckoutParams): string`
+
+Creates a Shopify checkout URL with pre-filled information.
+
+**Parameters:**
+```typescript
+type CheckoutParams = {
+  email: string;
+  items: Array<{
+    productVariantId: string;
+    quantity: string;
+  }>;
+  address: {
+    firstName: string;
+    lastName: string;
+    address1: string;
+    city: string;
+    zip: string;
+    country: string;
+    province: string;
+    phone: string;
+  };
+}
+```
+
+**Returns:** Pre-filled checkout URL string
+
+**Example:**
+```typescript
+const checkoutUrl = shop.checkout.createUrl({
+  email: 'customer@example.com',
+  items: [
+    { productVariantId: '12345', quantity: '2' },
+    { productVariantId: '67890', quantity: '1' }
+  ],
+  address: {
+    firstName: 'John',
+    lastName: 'Doe',
+    address1: '123 Main St',
+    city: 'New York',
+    zip: '10001',
+    country: 'United States',
+    province: 'New York',
+    phone: '+1234567890'
+  }
+});
+```
+
+## Type Definitions
+
+### Product
+
+```typescript
+type Product = {
+  // Identifiers
+  slug: string;
+  handle: string;
+  platformId: string | null;
+  
+  // Basic Information
+  title: string;
+  available: boolean;
+  productType: string | null;
+  vendor: string;
+  tags: string[];
+  
+  // Pricing
+  price: number;
+  priceMin: number;
+  priceMax: number;
+  priceVaries: boolean;
+  compareAtPrice: number;
+  compareAtPriceMin: number;
+  compareAtPriceMax: number;
+  compareAtPriceVaries: boolean;
+  discount: number;
+  currency?: string;
+  
+  // Content
+  bodyHtml: string | null;
+  featuredImage?: string | null;
+  isProxyFeaturedImage: boolean | null;
+  images: ProductImage[];
+  
+  // Variants and Options
+  variants: ProductVariant[] | null;
+  options: ProductOption[];
+  
+  // Metadata
+  seo?: MetaTag[] | null;
+  metaTags?: MetaTag[] | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  publishedAt: Date | null;
+  
+  // Store Context
+  storeSlug: string;
+  storeDomain: string;
+  url: string;
+  
+  // Additional
+  active?: boolean;
+  displayScore?: number;
+  deletedAt?: Date | null;
+  embedding?: number[] | null;
+  requiresSellingPlan?: boolean | null;
+  sellingPlanGroups?: unknown;
+};
+```
+
+### Collection
+
+```typescript
+type Collection = {
+  id: string;
+  title: string;
+  handle: string;
+  description?: string;
+  image?: {
+    id: number;
+    createdAt: string;
+    src: string;
+    alt?: string;
+  };
+  productsCount: number;
+  publishedAt: string;
+  updatedAt: string;
+};
+```
+
+### StoreInfo
+
+```typescript
+type StoreInfo = {
+  name: string;
+  domain: string;
+  slug: string;
+  title: string;
+  description: string;
+  logoUrl?: string;
+  socialLinks: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    youtube?: string;
+    tiktok?: string;
+    pinterest?: string;
+    linkedin?: string;
+  };
+  contactLinks: {
+    phone?: string;
+    email?: string;
+    contact?: string;
+    whatsapp?: string;
+  };
+  headerLinks: Array<{
+    title: string;
+    url: string;
+  }>;
+  showcase: {
+    products: string[];
+    collections: string[];
+  };
+  jsonLdData?: any;
+  techProvider: string;
+  country: string;
+};
+```
+
+### ProductVariant
+
+```typescript
+type ProductVariant = {
+  id: string;
+  title: string;
+  option1: string | null;
+  option2: string | null;
+  option3: string | null;
+  sku: string | null;
+  requiresShipping: boolean;
+  taxable: boolean;
+  featuredImage: ProductVariantImage | null;
+  available: boolean;
+  name?: string;
+  publicTitle?: string;
+  options: string[];
+  price: number;
+  weightInGrams?: number;
+  compareAtPrice: number;
+  position: number;
+  productId: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+```
+
+### ProductImage
+
+```typescript
+type ProductImage = {
+  id: number;
+  productId: number;
+  alt: string | null;
+  position: number;
+  src: string;
+  mediaType: "image" | "video";
+  variantIds: unknown[];
+  width: number;
+  height: number;
+  aspectRatio?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+```
+
+### ProductOption
+
+```typescript
+type ProductOption = {
+  name: string;
+  position: number;
+  values: string[];
+};
+```
+
+### MetaTag
+
+```typescript
+type MetaTag =
+  | { name: string; content: string }
+  | { property: string; content: string }
+  | { itemprop: string; content: string };
+```
+
+## Utility Functions
+
+### `detectShopifyCountry(domain: string): Promise<CountryDetectionResult>`
+
+Detects the country of a Shopify store based on various signals.
+
+**Parameters:**
+- `domain: string` - Store domain
+
+**Returns:** Country detection result with confidence score
+
+**Example:**
+```typescript
+import { detectShopifyCountry } from 'shop-search';
+
+const result = await detectShopifyCountry('anuki.in');
+console.log(`Country: ${result.country}, Confidence: ${result.confidence}`);
+```
+
+### `extractDomainWithoutSuffix(domain: string): string`
+
+Extracts domain name without TLD suffix.
+
+### `generateStoreSlug(domain: string): string`
+
+Generates SEO-friendly store slug from domain.
+
+### `genProductSlug(product: Product): string`
+
+Generates product slug from product data.
+
+### `calculateDiscount(price: number, compareAtPrice: number): number`
+
+Calculates discount percentage between prices.
+
+## Error Handling
+
+All async methods may throw errors for:
+- Network connectivity issues
+- Invalid domain formats
+- API rate limiting
+- Server errors (5xx responses)
+
+Handle errors appropriately:
+
+```typescript
+try {
+  const products = await shop.products.all();
+} catch (error) {
+  console.error('Failed to fetch products:', error.message);
+}
+```
+
+## Rate Limiting
+
+The library respects Shopify's rate limits. For high-volume usage:
+- Implement exponential backoff
+- Use pagination instead of fetching all data at once
+- Cache results when appropriate
+- Monitor for 429 (Too Many Requests) responses

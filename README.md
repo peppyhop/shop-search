@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`shop-search` is a powerful, type-safe Node.js library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.
+`shop-search` is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.
 
 ## 🚀 Features
 
@@ -515,16 +515,37 @@ async function analyzeCollections(shop: ShopClient) {
 
 ## 🤖 LLM Integration
 
-This package is designed to be LLM-friendly with:
+This package is designed to be LLM-friendly with comprehensive documentation and structured APIs:
 
-- **Comprehensive Type Definitions**: Full TypeScript support for better code generation
-- **Structured Data Access**: Consistent API patterns for predictable integration
-- **Rich Metadata**: Detailed product and store information for context-aware applications
-- **Error Handling**: Robust error management for reliable automation
-- **Semantic Search Ready**: Product embeddings and structured data for AI applications
+### For AI Code Generation
+- **Complete Type Safety**: Full TypeScript definitions enable accurate code completion and generation
+- **Predictable API Patterns**: Consistent method naming and return types across all operations
+- **Comprehensive Examples**: Real-world usage patterns in `/examples` directory
+- **Detailed Documentation**: Technical context in `/.llm` directory for AI understanding
+
+### For E-commerce AI Applications
+- **Rich Product Data**: Complete product information including variants, pricing, and metadata
+- **Structured Store Information**: Organized store data perfect for AI analysis and recommendations
+- **Search-Ready Data**: Product tags, descriptions, and categories optimized for semantic search
+- **Batch Operations**: Efficient data fetching for large-scale AI processing
+
+### LLM-Friendly Resources
+- [`llm.txt`](./llm.txt) - Complete repository overview and API surface
+- [`/.llm/context.md`](./.llm/context.md) - Technical architecture and implementation details
+- [`/.llm/api-reference.md`](./.llm/api-reference.md) - Comprehensive API documentation with examples
+- [`/.llm/examples.md`](./.llm/examples.md) - Code patterns and usage examples
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) - System design and extension points
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) - Development guidelines and best practices
+
+### AI Use Cases
+- **Product Recommendation Systems**: Rich product data with relationships and metadata
+- **Price Monitoring**: Automated price tracking and comparison tools
+- **Inventory Analysis**: Stock level monitoring and trend analysis
+- **Content Generation**: Product descriptions and marketing content creation
+- **Market Research**: Competitive analysis and market trend identification
 
 ### Keywords for LLM Discovery
-`shopify`, `ecommerce`, `product-data`, `store-scraping`, `typescript`, `nodejs`, `api-client`, `product-catalog`, `checkout`, `collections`, `variants`, `pricing`, `inventory`, `headless-commerce`
+`shopify`, `ecommerce`, `product-data`, `store-scraping`, `typescript`, `nodejs`, `api-client`, `product-catalog`, `checkout`, `collections`, `variants`, `pricing`, `inventory`, `headless-commerce`, `ai-ready`, `llm-friendly`, `semantic-search`, `product-recommendations`, `price-monitoring`
 
 ## 🛠️ Error Handling
 

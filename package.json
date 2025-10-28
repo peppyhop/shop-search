@@ -34,7 +34,7 @@
   ],
   "author": "tvayam.tech <<peppyhop@gmail.com>>",
   "license": "MIT",
-  "description": "A powerful, type-safe Node.js library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.",
+  "description": "A powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.",
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "jest": "^29.7.0",
