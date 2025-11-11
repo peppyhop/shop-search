@@ -256,6 +256,28 @@ const checkoutUrl = shop.checkout.createUrl({
 
 **Returns:** `string` - Complete checkout URL
 
+### Utilities
+
+Helper utilities exported for common normalization and parsing tasks.
+
+```typescript
+import { sanitizeDomain, safeParseDate } from 'shop-search';
+
+// Normalize domains safely
+sanitizeDomain('https://www.example.com');            // "example.com"
+sanitizeDomain('www.example.com', { stripWWW: false }); // "www.example.com"
+sanitizeDomain('http://example.com/path');            // "example.com"
+
+// Safely parse dates (avoids Invalid Date)
+safeParseDate('2024-10-31T12:34:56Z');  // Date
+safeParseDate('');                      // undefined
+safeParseDate('not-a-date');            // undefined
+```
+
+Notes:
+- `sanitizeDomain` trims protocols, paths, and optional `www.` depending on `stripWWW`.
+- `safeParseDate` returns `undefined` for invalid inputs; product `publishedAt` may be `null` when unavailable.
+
 ## 🏗️ Type Definitions
 
 ### StoreInfo
@@ -328,6 +350,11 @@ type Product = {
   requiresSellingPlan?: boolean | null;
   sellingPlanGroups?: unknown;
 };
+
+#### Date Handling
+
+- `createdAt` and `updatedAt` are parsed using a safe parser and may be `undefined` when source values are empty or invalid.
+- `publishedAt` is `Date | null` and will be `null` when unavailable or invalid.
 ```
 
 ### ProductVariant

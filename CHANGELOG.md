@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - Current Version
+
+### Added
+- New utility `sanitizeDomain(domain, options)` to normalize and validate domains
+- New utility `safeParseDate(input)` that returns `Date` for valid inputs or `undefined` for invalid/empty values
+- Unit tests for domain sanitization and safe date parsing
+
+### Changed
+- Product mapping now uses `safeParseDate` for `createdAt`, `updatedAt`, and `publishedAt` to prevent `Invalid Date`
+- `publishedAt` mapping in single-product DTO now defaults to `null` when input is invalid
+- Store info parsing: normalize protocol-relative (`//...`) and relative (`/...`) social/contact URLs to `https://`
+
+### Fixed
+- Preserved `www.` when `stripWWW: false` in `sanitizeDomain`
+- TypeScript issues in tests: removed non-existent variant fields and aligned `compare_at_price` types
+- Strengthened URL handling to avoid malformed links in `StoreInfo`
+
 ## [2.1.1] - Current Version
 
 ### Fixed

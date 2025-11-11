@@ -229,6 +229,15 @@ npm run test:coverage
 npm test -- products.test.ts
 ```
 
+### Utilities Usage Guidelines
+
+- Use `sanitizeDomain` for any domain normalization in code; avoid manual string parsing for domains.
+- Do not construct dates with `new Date(str)` directly in DTOs or mappers; use `safeParseDate(str)` and handle `undefined`/`null` appropriately.
+- When mapping product dates:
+  - `createdAt` / `updatedAt` should be `undefined` if source values are invalid or empty.
+  - `publishedAt` should be `null` when unavailable or invalid.
+- Normalize social/contact URLs to absolute `https://` URLs when parsing store info, supporting protocol-relative (`//...`) and relative (`/...`) inputs.
+
 ## Pull Request Process
 
 ### Before Submitting

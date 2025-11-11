@@ -150,12 +150,21 @@ export function createStoreOperations(context: {
         const socialLinks: Record<string, string> = {};
         const socialRegex =
           /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
-        let socialMatch;
-        while ((socialMatch = socialRegex.exec(html)) !== null) {
-          const url = new URL(socialMatch[1]);
-          const domain = url.hostname.replace("www.", "").split(".")[0];
-          if (domain) {
-            socialLinks[domain] = socialMatch[1];
+        for (const match of html.matchAll(socialRegex)) {
+          let href: string = match[1];
+          try {
+            if (href.startsWith("//")) {
+              href = `https:${href}`;
+            } else if (href.startsWith("/")) {
+              href = new URL(href, context.baseUrl).toString();
+            }
+            const parsed = new URL(href);
+            const domain = parsed.hostname.replace("www.", "").split(".")[0];
+            if (domain) {
+              socialLinks[domain] = parsed.toString();
+            }
+          } catch {
+            // Skip invalid URL entries silently
           }
         }
 
@@ -169,9 +178,8 @@ export function createStoreOperations(context: {
           "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
           "g",
         );
-        let contactMatch;
-        while ((contactMatch = contactRegex.exec(html)) !== null) {
-          const link = contactMatch[1];
+        for (const match of html.matchAll(contactRegex)) {
+          const link: string = match[1];
           if (link.startsWith("tel:")) {
             contactLinks.tel = link.replace("tel:", "").trim();
           } else if (link.startsWith("mailto:")) {

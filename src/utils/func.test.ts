@@ -1,4 +1,4 @@
-import { generateStoreSlug, extractDomainWithoutSuffix, genProductSlug, calculateDiscount } from './func';
+import { generateStoreSlug, extractDomainWithoutSuffix, genProductSlug, calculateDiscount, sanitizeDomain, safeParseDate } from './func';
 
 describe('Utility Functions', () => {
   describe('generateStoreSlug', () => {
@@ -141,6 +141,56 @@ describe('Utility Functions', () => {
     test('should round discount to nearest integer', () => {
       expect(calculateDiscount(33.33, 100)).toBe(67);
       expect(calculateDiscount(66.67, 100)).toBe(33);
+    });
+  });
+
+  describe('sanitizeDomain', () => {
+    test('normalizes full URLs to domain', () => {
+      expect(sanitizeDomain('https://WWW.Example.com/path?x=1#top')).toBe('example.com');
+      expect(sanitizeDomain('http://sub.example.co.uk/something')).toBe('example.co.uk');
+    });
+
+    test('handles protocol-relative and bare hostnames', () => {
+      expect(sanitizeDomain('//Example.com')).toBe('example.com');
+      expect(sanitizeDomain('www.example.com')).toBe('example.com');
+      expect(sanitizeDomain('EXAMPLE.CO.UK')).toBe('example.co.uk');
+    });
+
+    test('strips ports, paths, query and fragments', () => {
+      expect(sanitizeDomain('example.com:8080')).toBe('example.com');
+      expect(sanitizeDomain('example.com/path/to#frag')).toBe('example.com');
+      expect(sanitizeDomain('example.com?utm=1')).toBe('example.com');
+    });
+
+    test('respects stripWWW option', () => {
+      expect(sanitizeDomain('www.example.com', { stripWWW: false })).toBe('www.example.com');
+    });
+
+    test('throws for empty input', () => {
+      expect(() => sanitizeDomain('')).toThrow();
+      expect(() => sanitizeDomain('   ')).toThrow();
+      expect(() => sanitizeDomain(undefined as any)).toThrow();
+    });
+  });
+
+  describe('safeParseDate', () => {
+    test('returns a valid Date for ISO strings', () => {
+      const d = safeParseDate('2020-01-01T00:00:00Z');
+      expect(d).toBeInstanceOf(Date);
+      expect(d?.toISOString()).toBe('2020-01-01T00:00:00.000Z');
+    });
+
+    test('returns undefined for invalid strings', () => {
+      expect(safeParseDate('not-a-date')).toBeUndefined();
+      expect(safeParseDate('')).toBeUndefined();
+      expect(safeParseDate(undefined)).toBeUndefined();
+      expect(safeParseDate(null)).toBeUndefined();
+    });
+
+    test('handles non-ISO but parseable dates', () => {
+      const d = safeParseDate('Jan 2, 2021');
+      expect(d).toBeInstanceOf(Date);
+      expect(Number.isNaN(d!.getTime())).toBe(false);
     });
   });
 });

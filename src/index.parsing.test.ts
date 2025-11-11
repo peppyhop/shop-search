@@ -1,0 +1,45 @@
+import { ShopClient } from './index';
+
+jest.mock('./utils/detect-country', () => ({
+  detectShopifyCountry: jest.fn(async () => ({ country: 'US' })),
+}));
+
+describe('ShopClient.getInfo parsing', () => {
+  const baseUrl = 'https://examplestore.com/';
+
+  const html = `
+    <meta name="og:site_name" content="Example Store">
+    <meta name="description" content="An example description">
+    <a href="//instagram.com/example">Instagram</a>
+    <a href="https://www.twitter.com/example">Twitter</a>
+    <a href="https://www.linkedin.com/company/example/">LinkedIn</a>
+    <a href="/pages/contact">Contact Us</a>
+    <a href="mailto:support@example.com">Email</a>
+    <a href="tel:+1234567890">Call</a>
+    <script type="application/ld+json">{"name":"Example"}</script>
+  `;
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => html,
+    }) as any;
+  });
+
+  afterEach(() => {
+    (global.fetch as jest.Mock | undefined)?.mockReset();
+  });
+
+  test('normalizes protocol-relative social URLs and extracts contact links', async () => {
+    const shop = new ShopClient(baseUrl);
+    const info = await shop.getInfo();
+
+    expect(info.socialLinks.instagram).toBe('https://instagram.com/example');
+    expect(info.socialLinks.twitter).toBe('https://www.twitter.com/example');
+    expect(info.socialLinks.linkedin).toBe('https://www.linkedin.com/company/example/');
+
+    expect(info.contactLinks.tel).toBe('+1234567890');
+    expect(info.contactLinks.email).toBe('support@example.com');
+    expect(info.contactLinks.contactPage).toBe('/pages/contact');
+  });
+});

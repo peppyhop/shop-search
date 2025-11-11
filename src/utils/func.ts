@@ -39,3 +39,67 @@ export const calculateDiscount = (
         0,
         Math.round(100 - (price / compareAtPrice) * 100) // Removed the decimal precision
       );
+
+/**
+ * Normalize and sanitize a domain string.
+ *
+ * Accepts inputs like full URLs, protocol-relative URLs, bare hostnames,
+ * or strings with paths/query/fragment, and returns a normalized domain.
+ *
+ * Examples:
+ *  - "https://WWW.Example.com/path" -> "example.com"
+ *  - "//sub.example.co.uk" -> "example.co.uk"
+ *  - "www.example.com:8080" -> "example.com"
+ *  - "example" -> "example"
+ */
+export function sanitizeDomain(input: string, opts?: { stripWWW?: boolean }): string {
+  if (typeof input !== 'string') {
+    throw new Error('sanitizeDomain: input must be a string');
+  }
+  const raw = input.trim();
+  if (!raw) {
+    throw new Error('sanitizeDomain: input cannot be empty');
+  }
+
+  const stripWWW = opts?.stripWWW ?? true;
+
+  try {
+    let url: URL;
+    if (raw.startsWith('//')) {
+      url = new URL(`https:${raw}`);
+    } else if (raw.includes('://')) {
+      url = new URL(raw);
+    } else {
+      url = new URL(`https://${raw}`);
+    }
+    let hostname = url.hostname.toLowerCase();
+    if (stripWWW) hostname = hostname.replace(/^www\./, '');
+    const parsed = parse(hostname);
+    // If the caller explicitly wants to keep www, preserve it
+    if (!stripWWW && /^www\./.test(url.hostname)) {
+      return hostname;
+    }
+    return (parsed.domain ?? hostname) || hostname;
+  } catch {
+    // Fallback: attempt to sanitize without URL parsing
+    let hostname = raw.toLowerCase();
+    hostname = hostname.replace(/^[a-z]+:\/\//, ''); // remove protocol if present
+    hostname = hostname.replace(/^\/\//, ''); // remove protocol-relative
+    hostname = hostname.replace(/[\/:#?].*$/, ''); // remove path/query/fragment/port
+    if (stripWWW) hostname = hostname.replace(/^www\./, '');
+    const parsed = parse(hostname);
+    return (parsed.domain ?? hostname) || hostname;
+  }
+}
+
+/**
+ * Safely parse a date string into a Date object.
+ *
+ * Returns `undefined` when input is falsy or cannot be parsed into a valid date.
+ * Use `|| null` at call sites that expect `null` instead of `undefined`.
+ */
+export function safeParseDate(input?: string | null): Date | undefined {
+  if (!input || typeof input !== 'string') return undefined;
+  const d = new Date(input);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}

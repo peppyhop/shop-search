@@ -98,6 +98,18 @@ class ShopClient {
 - Store information retrieval
 - Error boundary management
 
+### Utilities
+
+Shared utility functions support consistent normalization and parsing across modules:
+
+- `sanitizeDomain(domain, options)`: Normalizes domains by removing protocols/paths and optionally preserving `www.`. Use this for any domain handling at entry points and when rendering store metadata.
+- `safeParseDate(input)`: Safely parses date strings; returns `undefined` for invalid/empty inputs. All DTOs and mappers should use this to avoid `Invalid Date` values in responses.
+
+Date handling policy:
+- Product `createdAt` / `updatedAt` use safe parsing and may be `undefined` when the source is invalid.
+- Product `publishedAt` is `Date | null` and defaults to `null` when unavailable or invalid.
+- Collection `publishedAt` / `updatedAt` remain strings reflecting Shopify API, and should be parsed only at the consumption layer if needed.
+
 ### ProductOperations
 
 Handles all product-related functionality:

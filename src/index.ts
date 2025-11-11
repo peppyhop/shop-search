@@ -11,11 +11,12 @@ import {
   ShopifySingleProduct,
 } from "./types";
 import { detectShopifyCountry } from "./utils/detect-country";
-import {
-  extractDomainWithoutSuffix,
-  generateStoreSlug,
-  genProductSlug,
-} from "./utils/func";
+  import {
+    extractDomainWithoutSuffix,
+    generateStoreSlug,
+    genProductSlug,
+    safeParseDate,
+  } from "./utils/func";
 
 /**
  * A comprehensive Shopify store client for fetching products, collections, and store information.
@@ -232,8 +233,8 @@ export class ShopClient {
       vendor: product.vendor,
       featuredImage: product.images.length > 0 ? this.normalizeImageUrl(product.images[0].src) : null,
       isProxyFeaturedImage: false,
-      createdAt: product.created_at ? new Date(product.created_at) : undefined,
-      updatedAt: product.updated_at ? new Date(product.updated_at) : undefined,
+      createdAt: safeParseDate(product.created_at),
+      updatedAt: safeParseDate(product.updated_at),
       variants: product.variants.map(variant => ({
         id: variant.id.toString(),
         platformId: variant.id.toString(),
@@ -281,7 +282,7 @@ export class ShopClient {
         createdAt: image.created_at,
         updatedAt: image.updated_at
       })),
-      publishedAt: new Date(product.published_at),
+      publishedAt: safeParseDate(product.published_at) ?? null,
       seo: null,
       metaTags: null,
       displayScore: undefined,
@@ -325,8 +326,8 @@ export class ShopClient {
       vendor: product.vendor,
       featuredImage: this.normalizeImageUrl(product.featured_image),
       isProxyFeaturedImage: false,
-      createdAt: new Date(product.created_at),
-      updatedAt: new Date(product.updated_at),
+      createdAt: safeParseDate(product.created_at),
+      updatedAt: safeParseDate(product.updated_at),
       variants: product.variants.map(variant => ({
         id: variant.id.toString(),
         platformId: variant.id.toString(),
@@ -374,7 +375,7 @@ export class ShopClient {
         createdAt: product.created_at,
         updatedAt: product.updated_at
       })) : [],
-      publishedAt: new Date(product.published_at),
+      publishedAt: safeParseDate(product.published_at) ?? null,
       seo: null,
       metaTags: null,
       displayScore: undefined,
@@ -707,12 +708,24 @@ export class ShopClient {
       const socialLinks: Record<string, string> = {};
       const socialRegex =
         /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
-      let socialMatch;
-      while ((socialMatch = socialRegex.exec(html)) !== null) {
-        const url = new URL(socialMatch[1]);
-        const domain = url.hostname.replace("www.", "").split(".")[0];
-        if (domain) {
-          socialLinks[domain] = socialMatch[1];
+      for (const match of html.matchAll(socialRegex)) {
+        let href: string = match[1];
+        try {
+          // Normalize protocol-relative URLs and relative paths
+          if (href.startsWith("//")) {
+            href = `https:${href}`;
+          } else if (href.startsWith("/")) {
+            href = new URL(href, this.baseUrl).toString();
+          }
+
+          const parsed = new URL(href);
+          const domain = parsed.hostname.replace("www.", "").split(".")[0];
+          if (domain) {
+            socialLinks[domain] = parsed.toString();
+          }
+        } catch {
+          // Skip invalid URLs found in markup without failing the entire operation
+          // Continue to next match
         }
       }
 
@@ -726,9 +739,8 @@ export class ShopClient {
         "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
         "g",
       );
-      let contactMatch;
-      while ((contactMatch = contactRegex.exec(html)) !== null) {
-        const link = contactMatch[1];
+      for (const match of html.matchAll(contactRegex)) {
+        const link: string = match[1];
         if (link.startsWith("tel:")) {
           contactLinks.tel = link.replace("tel:", "").trim();
         } else if (link.startsWith("mailto:")) {
@@ -850,65 +862,62 @@ export class ShopClient {
   }
 }
 
-// Export all types for external use
-export type {
-  // Core product and collection types
-  Product,
-  Collection,
-  ProductVariant,
-  ProductImage,
-  ProductOption,
-  ProductPricing,
-  ProductVariantImage,
-  MetaTag,
-  
-  // Shopify API types
-  ShopifyProduct,
-  ShopifyCollection,
-  ShopifySingleProduct,
-  ShopifyProductVariant,
-  ShopifySingleProductVariant,
-  ShopifyImage,
-  ShopifyVariantImage,
-  ShopifyFeaturedMedia,
-  ShopifyMedia,
-  ShopifyOption,
-  ShopifyBaseVariant,
-  ShopifyBaseProduct,
-  ShopifyApiProduct,
-  ShopifyPredictiveProductSearch,
-  ShopifyTimestamps,
-  ShopifyBasicInfo,
-  ShopifyImageDimensions,
-  ShopifyFeaturesData,
-  
-  // Store and catalog types
-  StoreCatalog,
-  CatalogCategory,
-  Demographics,
-  ValidStoreCatalog,
-  Address,
-  ContactUrls,
-  Coupon,
-  
-  // Country detection types
-  CountryDetectionResult,
-  CountryScore,
-  CountryScores,
-} from "./types";
-
+export type { CheckoutOperations } from "./checkout";
+export type { CollectionOperations } from "./collections";
 // Export operation interfaces
 export type { ProductOperations } from "./products";
-export type { CollectionOperations } from "./collections";
-export type { CheckoutOperations } from "./checkout";
-export type { StoreOperations, StoreInfo } from "./store";
-
+export type { StoreInfo, StoreOperations } from "./store";
+// Export all types for external use
+export type {
+	Address,
+	CatalogCategory,
+	Collection,
+	ContactUrls,
+	// Country detection types
+	CountryDetectionResult,
+	CountryScore,
+	CountryScores,
+	Coupon,
+	Demographics,
+	MetaTag,
+	// Core product and collection types
+	Product,
+	ProductImage,
+	ProductOption,
+	ProductPricing,
+	ProductVariant,
+	ProductVariantImage,
+	ShopifyApiProduct,
+	ShopifyBaseProduct,
+	ShopifyBaseVariant,
+	ShopifyBasicInfo,
+	ShopifyCollection,
+	ShopifyFeaturedMedia,
+	ShopifyFeaturesData,
+	ShopifyImage,
+	ShopifyImageDimensions,
+	ShopifyMedia,
+	ShopifyOption,
+	ShopifyPredictiveProductSearch,
+	// Shopify API types
+	ShopifyProduct,
+	ShopifyProductVariant,
+	ShopifySingleProduct,
+	ShopifySingleProductVariant,
+	ShopifyTimestamps,
+	ShopifyVariantImage,
+	// Store and catalog types
+	StoreCatalog,
+	ValidStoreCatalog,
+} from "./types";
+export { detectShopifyCountry } from "./utils/detect-country";
 // Export utility functions
 export {
-  extractDomainWithoutSuffix,
-  generateStoreSlug,
-  genProductSlug,
-  calculateDiscount,
+  	calculateDiscount,
+  	extractDomainWithoutSuffix,
+  	generateStoreSlug,
+  	genProductSlug,
+  	sanitizeDomain,
+  	safeParseDate,
 } from "./utils/func";
 
-export { detectShopifyCountry } from "./utils/detect-country";
