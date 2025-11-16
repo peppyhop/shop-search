@@ -1,4 +1,8 @@
-import type { CountryDetectionResult, CountryScores, ShopifyFeaturesData } from '../types';
+import type {
+  CountryDetectionResult,
+  CountryScores,
+  ShopifyFeaturesData,
+} from "../types";
 
 const COUNTRY_CODES: Record<string, string> = {
   "+1": "US", // United States (primary) / Canada also uses +1
@@ -21,17 +25,22 @@ const COUNTRY_CODES: Record<string, string> = {
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   "₹": "IN", // India
-  "$": "US", // United States (primary, though many countries use $)
-  "CA$": "CA", // Canada
-  "A$": "AU", // Australia
+  $: "US", // United States (primary, though many countries use $)
+  CA$: "CA", // Canada
+  A$: "AU", // Australia
   "£": "GB", // United Kingdom
   "€": "EU", // European Union (not a country code, but commonly used)
-  "AED": "AE", // United Arab Emirates
+  AED: "AE", // United Arab Emirates
   "₩": "KR", // South Korea
   "¥": "JP", // Japan (primary, though China also uses ¥)
 };
 
-function scoreCountry(countryScores: CountryScores, country: string, weight: number, reason: string): void {
+function scoreCountry(
+  countryScores: CountryScores,
+  country: string,
+  weight: number,
+  reason: string
+): void {
   if (!country) return;
   if (!countryScores[country])
     countryScores[country] = { score: 0, reasons: [] };
@@ -41,33 +50,34 @@ function scoreCountry(countryScores: CountryScores, country: string, weight: num
 
 /**
  * Detects the country of a Shopify store by analyzing various signals in the HTML content.
- * 
+ *
  * This function examines multiple data sources within the HTML to determine the store's country:
  * - Shopify features JSON data (country, locale, money format)
  * - Phone number prefixes in contact information
  * - JSON-LD structured data with address information
  * - Footer mentions of country names
  * - Currency symbols in money formatting
- * 
+ *
  * @param html - The HTML content of the Shopify store's homepage
  * @returns Promise resolving to country detection results containing:
  * - `country` - The detected country ISO 3166-1 alpha-2 code (e.g., "US", "GB") or "Unknown" if no reliable detection
  * - `confidence` - Confidence score between 0 and 1 (higher = more confident)
  * - `signals` - Array of detection signals that contributed to the result
- * 
+ *
  * @example
  * ```typescript
  * const response = await fetch('https://exampleshop.com');
  * const html = await response.text();
  * const result = await detectShopifyCountry(html);
- * 
+ *
  * console.log(result.country); // "US" (ISO code for United States)
  * console.log(result.confidence); // 0.85
  * console.log(result.signals); // ["shopify-features.country", "phone prefix +1"]
  * ```
  */
-export async function detectShopifyCountry(html: string): Promise<CountryDetectionResult> {
-
+export async function detectShopifyCountry(
+  html: string
+): Promise<CountryDetectionResult> {
   const countryScores: CountryScores = {};
 
   // 1️⃣ Extract Shopify features JSON
@@ -78,15 +88,30 @@ export async function detectShopifyCountry(html: string): Promise<CountryDetecti
     try {
       const data: ShopifyFeaturesData = JSON.parse(shopifyFeaturesMatch[1]);
       if (data.country)
-        scoreCountry(countryScores, data.country, 1, "shopify-features.country");
+        scoreCountry(
+          countryScores,
+          data.country,
+          1,
+          "shopify-features.country"
+        );
       if (data.locale?.includes("-")) {
         const localeCountry = data.locale.split("-")[1];
-        scoreCountry(countryScores, localeCountry.toUpperCase(), 0.7, "shopify-features.locale");
+        scoreCountry(
+          countryScores,
+          localeCountry.toUpperCase(),
+          0.7,
+          "shopify-features.locale"
+        );
       }
       if (data.moneyFormat) {
         for (const symbol in CURRENCY_SYMBOLS) {
           if (data.moneyFormat.includes(symbol))
-            scoreCountry(countryScores, CURRENCY_SYMBOLS[symbol], 0.6, "moneyFormat symbol");
+            scoreCountry(
+              countryScores,
+              CURRENCY_SYMBOLS[symbol],
+              0.6,
+              "moneyFormat symbol"
+            );
         }
       }
     } catch (error) {
@@ -100,21 +125,55 @@ export async function detectShopifyCountry(html: string): Promise<CountryDetecti
     for (const phone of phones) {
       const prefix = phone.match(/^\+\d{1,3}/)?.[0];
       if (prefix && COUNTRY_CODES[prefix])
-        scoreCountry(countryScores, COUNTRY_CODES[prefix], 0.8, `phone prefix ${prefix}`);
+        scoreCountry(
+          countryScores,
+          COUNTRY_CODES[prefix],
+          0.8,
+          `phone prefix ${prefix}`
+        );
     }
   }
 
   // 3️⃣ Extract JSON-LD addressCountry fields
   const jsonLdRegex = /<script[^>]+application\/ld\+json[^>]*>(.*?)<\/script>/g;
-  let jsonLdMatch;
-  while ((jsonLdMatch = jsonLdRegex.exec(html)) !== null) {
+  let jsonLdMatch: RegExpExecArray | null = jsonLdRegex.exec(html);
+  while (jsonLdMatch !== null) {
     try {
-      const data = JSON.parse(jsonLdMatch[1]) as any;
-      const addr = data?.address?.addressCountry;
-      if (addr) scoreCountry(countryScores, addr, 1, "JSON-LD addressCountry");
+      const raw = JSON.parse(jsonLdMatch[1]) as unknown;
+
+      const collectAddressCountries = (
+        node: unknown,
+        results: string[] = []
+      ): string[] => {
+        if (Array.isArray(node)) {
+          for (const item of node) collectAddressCountries(item, results);
+          return results;
+        }
+        if (node && typeof node === "object") {
+          const obj = node as Record<string, unknown>;
+          const address = obj["address"];
+          if (address && typeof address === "object") {
+            const country = (address as Record<string, unknown>)[
+              "addressCountry"
+            ];
+            if (typeof country === "string") results.push(country);
+          }
+          // Support nested graphs
+          const graph = obj["@graph"];
+          if (graph) collectAddressCountries(graph, results);
+        }
+        return results;
+      };
+
+      const countries = collectAddressCountries(raw);
+      for (const country of countries) {
+        scoreCountry(countryScores, country, 1, "JSON-LD addressCountry");
+      }
     } catch (error) {
       // Silently handle JSON parsing errors
     }
+    // advance to next match
+    jsonLdMatch = jsonLdRegex.exec(html);
   }
 
   // 4️⃣ Footer country mentions - now using ISO codes
@@ -123,27 +182,27 @@ export async function detectShopifyCountry(html: string): Promise<CountryDetecti
     const footerText = footerMatch[1].toLowerCase();
     // Create a mapping of country names to ISO codes for footer detection
     const countryNameToISO: Record<string, string> = {
-      'india': 'IN',
-      'united states': 'US',
-      'canada': 'CA', 
-      'australia': 'AU',
-      'united kingdom': 'GB',
-      'britain': 'GB',
-      'uk': 'GB',
-      'japan': 'JP',
-      'south korea': 'KR',
-      'korea': 'KR',
-      'germany': 'DE',
-      'france': 'FR',
-      'italy': 'IT',
-      'spain': 'ES',
-      'brazil': 'BR',
-      'russia': 'RU',
-      'singapore': 'SG',
-      'indonesia': 'ID',
-      'pakistan': 'PK'
+      india: "IN",
+      "united states": "US",
+      canada: "CA",
+      australia: "AU",
+      "united kingdom": "GB",
+      britain: "GB",
+      uk: "GB",
+      japan: "JP",
+      "south korea": "KR",
+      korea: "KR",
+      germany: "DE",
+      france: "FR",
+      italy: "IT",
+      spain: "ES",
+      brazil: "BR",
+      russia: "RU",
+      singapore: "SG",
+      indonesia: "ID",
+      pakistan: "PK",
     };
-    
+
     for (const [countryName, isoCode] of Object.entries(countryNameToISO)) {
       if (footerText.includes(countryName))
         scoreCountry(countryScores, isoCode, 0.4, "footer mention");
@@ -151,7 +210,9 @@ export async function detectShopifyCountry(html: string): Promise<CountryDetecti
   }
 
   // Pick best guess
-  const sorted = Object.entries(countryScores).sort((a, b) => b[1].score - a[1].score);
+  const sorted = Object.entries(countryScores).sort(
+    (a, b) => b[1].score - a[1].score
+  );
   const best = sorted[0];
 
   return best

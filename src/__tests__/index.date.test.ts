@@ -1,16 +1,22 @@
-import { ShopClient } from './index';
-import type { ShopifySingleProduct, ShopifyProduct, ShopifyProductVariant, ShopifyImage, ShopifySingleProductVariant } from './types';
+import { ShopClient } from "../index";
+import type {
+  ShopifySingleProduct,
+  ShopifyProduct,
+  ShopifyProductVariant,
+  ShopifyImage,
+  ShopifySingleProductVariant,
+} from "../types";
 
-describe('Date sanitization in product mapping', () => {
-  test('productDto sanitizes invalid created/updated/published dates', () => {
-    const shop = new ShopClient('https://example.com');
+describe("Date sanitization in product mapping", () => {
+  test("productDto sanitizes invalid created/updated/published dates", () => {
+    const shop = new ShopClient("https://example.com");
 
     const variant: ShopifySingleProductVariant = {
       id: 1,
-      title: 'v1',
-      handle: 'v1',
-      created_at: '2020-01-01T00:00:00Z',
-      updated_at: '2020-01-01T00:00:00Z',
+      title: "v1",
+      handle: "v1",
+      created_at: "2020-01-01T00:00:00Z",
+      updated_at: "2020-01-01T00:00:00Z",
       option1: null,
       option2: null,
       option3: null,
@@ -22,7 +28,7 @@ describe('Date sanitization in product mapping', () => {
       featured_image: null,
       featured_media: null,
       available: true,
-      price: '100',
+      price: "100",
       compare_at_price: null,
       inventory_quantity: 0,
       inventory_management: null,
@@ -38,16 +44,16 @@ describe('Date sanitization in product mapping', () => {
 
     const product: ShopifySingleProduct = {
       id: 1,
-      title: 'Test Product',
-      handle: 'test-product',
-      created_at: 'not-a-date',
-      updated_at: 'not-a-date',
-      vendor: 'Vendor',
+      title: "Test Product",
+      handle: "test-product",
+      created_at: "not-a-date",
+      updated_at: "not-a-date",
+      vendor: "Vendor",
       tags: [],
-      options: [{ name: 'Size', position: 1, values: [] }],
-      description: 'desc',
-      published_at: 'not-a-date',
-      type: 'type',
+      options: [{ name: "Size", position: 1, values: [] }],
+      description: "desc",
+      published_at: "not-a-date",
+      type: "type",
       price: 100,
       price_min: 100,
       price_max: 100,
@@ -72,15 +78,15 @@ describe('Date sanitization in product mapping', () => {
     expect(mapped.publishedAt).toBeNull();
   });
 
-  test('productsDto sanitizes invalid created/updated/published dates', () => {
-    const shop = new ShopClient('https://example.com');
+  test("productsDto sanitizes invalid created/updated/published dates", () => {
+    const shop = new ShopClient("https://example.com");
 
     const variant: ShopifyProductVariant = {
       id: 1,
-      title: 'v1',
-      handle: 'v1',
-      created_at: '2020-01-01T00:00:00Z',
-      updated_at: '2020-01-01T00:00:00Z',
+      title: "v1",
+      handle: "v1",
+      created_at: "2020-01-01T00:00:00Z",
+      updated_at: "2020-01-01T00:00:00Z",
       option1: null,
       option2: null,
       option3: null,
@@ -91,21 +97,21 @@ describe('Date sanitization in product mapping', () => {
       product_id: 1,
       featured_image: null,
       available: true,
-      price: '100',
+      price: "100",
       weightInGrams: undefined,
       compare_at_price: undefined,
     };
 
     const image: ShopifyImage = {
       id: 1,
-      title: 'img',
-      handle: 'img',
-      created_at: '2020-01-01T00:00:00Z',
-      updated_at: '2020-01-01T00:00:00Z',
+      title: "img",
+      handle: "img",
+      created_at: "2020-01-01T00:00:00Z",
+      updated_at: "2020-01-01T00:00:00Z",
       width: 0,
       height: 0,
       aspect_ratio: 1,
-      src: 'https://example.com/img.jpg',
+      src: "https://example.com/img.jpg",
       position: 1,
       product_id: 1,
       variant_ids: [],
@@ -113,17 +119,17 @@ describe('Date sanitization in product mapping', () => {
 
     const product: ShopifyProduct = {
       id: 1,
-      title: 'Test Product',
-      handle: 'test-product',
-      created_at: 'not-a-date',
-      updated_at: 'not-a-date',
-      vendor: 'Vendor',
+      title: "Test Product",
+      handle: "test-product",
+      created_at: "not-a-date",
+      updated_at: "not-a-date",
+      vendor: "Vendor",
       tags: [],
-      options: [{ name: 'Size', position: 1, values: [] }],
-      body_html: '<p>body</p>',
+      options: [{ name: "Size", position: 1, values: [] }],
+      body_html: "<p>body</p>",
       body: undefined,
-      published_at: 'not-a-date',
-      product_type: 'type',
+      published_at: "not-a-date",
+      product_type: "type",
       variants: [variant],
       images: [image],
     };

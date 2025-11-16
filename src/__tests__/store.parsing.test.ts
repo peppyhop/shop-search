@@ -1,11 +1,11 @@
-import { createStoreOperations } from './store';
+import { createStoreOperations } from "../store";
 
-jest.mock('./utils/detect-country', () => ({
-  detectShopifyCountry: jest.fn(async () => ({ country: 'US' })),
+jest.mock("../utils/detect-country", () => ({
+  detectShopifyCountry: jest.fn(async () => ({ country: "US" })),
 }));
 
-describe('StoreOperations.info parsing', () => {
-  const baseUrl = 'https://examplestore.com/';
+describe("StoreOperations.info parsing", () => {
+  const baseUrl = "https://examplestore.com/";
 
   const html = `
     <meta name="og:site_name" content="Example Store">
@@ -30,36 +30,42 @@ describe('StoreOperations.info parsing', () => {
     (global.fetch as jest.Mock | undefined)?.mockReset();
   });
 
-  test('parses social links including protocol-relative and normalizes to https', async () => {
+  test("parses social links including protocol-relative and normalizes to https", async () => {
     const ops = createStoreOperations({
       baseUrl,
       storeDomain: baseUrl,
       validateProductExists: async () => true,
       validateCollectionExists: async () => true,
       validateLinksInBatches: async <T>(items: T[]) => items,
-      handleFetchError: (error: unknown) => { throw error as Error; },
+      handleFetchError: (error: unknown) => {
+        throw error as Error;
+      },
     });
 
     const info = await ops.info();
     expect(info.socialLinks).toBeDefined();
-    expect(info.socialLinks.instagram).toBe('https://instagram.com/example');
-    expect(info.socialLinks.twitter).toBe('https://www.twitter.com/example');
-    expect(info.socialLinks.linkedin).toBe('https://www.linkedin.com/company/example/');
+    expect(info.socialLinks.instagram).toBe("https://instagram.com/example");
+    expect(info.socialLinks.twitter).toBe("https://www.twitter.com/example");
+    expect(info.socialLinks.linkedin).toBe(
+      "https://www.linkedin.com/company/example/"
+    );
   });
 
-  test('parses contact links for tel, mailto, and contact page', async () => {
+  test("parses contact links for tel, mailto, and contact page", async () => {
     const ops = createStoreOperations({
       baseUrl,
       storeDomain: baseUrl,
       validateProductExists: async () => true,
       validateCollectionExists: async () => true,
       validateLinksInBatches: async <T>(items: T[]) => items,
-      handleFetchError: (error: unknown) => { throw error as Error; },
+      handleFetchError: (error: unknown) => {
+        throw error as Error;
+      },
     });
 
     const info = await ops.info();
-    expect(info.contactLinks.tel).toBe('+1234567890');
-    expect(info.contactLinks.email).toBe('support@example.com');
-    expect(info.contactLinks.contactPage).toBe('/pages/contact');
+    expect(info.contactLinks.tel).toBe("+1234567890");
+    expect(info.contactLinks.email).toBe("support@example.com");
+    expect(info.contactLinks.contactPage).toBe("/pages/contact");
   });
 });

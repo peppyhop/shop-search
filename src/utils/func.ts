@@ -52,28 +52,31 @@ export const calculateDiscount = (
  *  - "www.example.com:8080" -> "example.com"
  *  - "example" -> "example"
  */
-export function sanitizeDomain(input: string, opts?: { stripWWW?: boolean }): string {
-  if (typeof input !== 'string') {
-    throw new Error('sanitizeDomain: input must be a string');
+export function sanitizeDomain(
+  input: string,
+  opts?: { stripWWW?: boolean }
+): string {
+  if (typeof input !== "string") {
+    throw new Error("sanitizeDomain: input must be a string");
   }
   const raw = input.trim();
   if (!raw) {
-    throw new Error('sanitizeDomain: input cannot be empty');
+    throw new Error("sanitizeDomain: input cannot be empty");
   }
 
   const stripWWW = opts?.stripWWW ?? true;
 
   try {
     let url: URL;
-    if (raw.startsWith('//')) {
+    if (raw.startsWith("//")) {
       url = new URL(`https:${raw}`);
-    } else if (raw.includes('://')) {
+    } else if (raw.includes("://")) {
       url = new URL(raw);
     } else {
       url = new URL(`https://${raw}`);
     }
     let hostname = url.hostname.toLowerCase();
-    if (stripWWW) hostname = hostname.replace(/^www\./, '');
+    if (stripWWW) hostname = hostname.replace(/^www\./, "");
     const parsed = parse(hostname);
     // If the caller explicitly wants to keep www, preserve it
     if (!stripWWW && /^www\./.test(url.hostname)) {
@@ -83,10 +86,10 @@ export function sanitizeDomain(input: string, opts?: { stripWWW?: boolean }): st
   } catch {
     // Fallback: attempt to sanitize without URL parsing
     let hostname = raw.toLowerCase();
-    hostname = hostname.replace(/^[a-z]+:\/\//, ''); // remove protocol if present
-    hostname = hostname.replace(/^\/\//, ''); // remove protocol-relative
-    hostname = hostname.replace(/[\/:#?].*$/, ''); // remove path/query/fragment/port
-    if (stripWWW) hostname = hostname.replace(/^www\./, '');
+    hostname = hostname.replace(/^[a-z]+:\/\//, ""); // remove protocol if present
+    hostname = hostname.replace(/^\/\//, ""); // remove protocol-relative
+    hostname = hostname.replace(/[\/:#?].*$/, ""); // remove path/query/fragment/port
+    if (stripWWW) hostname = hostname.replace(/^www\./, "");
     const parsed = parse(hostname);
     return (parsed.domain ?? hostname) || hostname;
   }
@@ -99,7 +102,76 @@ export function sanitizeDomain(input: string, opts?: { stripWWW?: boolean }): st
  * Use `|| null` at call sites that expect `null` instead of `undefined`.
  */
 export function safeParseDate(input?: string | null): Date | undefined {
-  if (!input || typeof input !== 'string') return undefined;
+  if (!input || typeof input !== "string") return undefined;
   const d = new Date(input);
   return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/**
+ * Normalize an option name or value to a lowercase, underscore-separated key.
+ */
+export function normalizeKey(input: string): string {
+  return input.toLowerCase().replace(/\s+/g, "_");
+}
+
+/**
+ * Build a map from normalized option combination → variant id strings.
+ * Example key: `size#xl##color#blue`.
+ */
+export function buildVariantOptionsMap(
+  optionNames: string[],
+  variants: Array<{
+    id: number;
+    option1: string | null;
+    option2: string | null;
+    option3: string | null;
+  }>
+): Record<string, string> {
+  const keys = optionNames.map(normalizeKey);
+  const map: Record<string, string> = {};
+
+  for (const v of variants) {
+    const parts: string[] = [];
+    if (keys[0] && v.option1)
+      parts.push(`${keys[0]}#${normalizeKey(v.option1)}`);
+    if (keys[1] && v.option2)
+      parts.push(`${keys[1]}#${normalizeKey(v.option2)}`);
+    if (keys[2] && v.option3)
+      parts.push(`${keys[2]}#${normalizeKey(v.option3)}`);
+
+    if (parts.length > 0) {
+      // Ensure deterministic alphabetical ordering of parts
+      parts.sort((a, b) => a.localeCompare(b));
+      const key = parts.join("##");
+      const id = v.id.toString();
+      // First-write wins: do not override if key already exists
+      if (map[key] === undefined) {
+        map[key] = id;
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Build a normalized variant key string from an object of option name → value.
+ * - Normalizes both names and values using `normalizeKey`
+ * - Sorts parts alphabetically for deterministic output
+ * - Joins parts using `##` and uses `name#value` for each part
+ *
+ * Example output: `color#blue##size#xl`
+ */
+export function buildVariantKey(
+  obj: Record<string, string | null | undefined>
+): string {
+  const parts: string[] = [];
+  for (const [name, value] of Object.entries(obj)) {
+    if (value) {
+      parts.push(`${normalizeKey(name)}#${normalizeKey(value)}`);
+    }
+  }
+  if (parts.length === 0) return "";
+  parts.sort((a, b) => a.localeCompare(b));
+  return parts.join("##");
 }

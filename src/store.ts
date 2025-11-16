@@ -1,5 +1,5 @@
 import { unique } from "remeda";
-import type { CountryDetectionResult } from "./types";
+import type { CountryDetectionResult, JsonLdEntry } from "./types";
 import { detectShopifyCountry } from "./utils/detect-country";
 import { extractDomainWithoutSuffix, generateStoreSlug } from "./utils/func";
 
@@ -33,7 +33,7 @@ export interface StoreInfo {
     products: string[];
     collections: string[];
   };
-  jsonLdData: any[] | undefined;
+  jsonLdData: JsonLdEntry[] | undefined;
   techProvider: {
     name: string;
     walletId: string | undefined;
@@ -61,7 +61,7 @@ export function createStoreOperations(context: {
   return {
     /**
      * Fetches comprehensive store information including metadata, social links, and showcase content.
-     * 
+     *
      * @returns {Promise<StoreInfo>} Store information object containing:
      * - `name` - Store name from meta tags or domain
      * - `domain` - Store domain URL
@@ -76,14 +76,14 @@ export function createStoreOperations(context: {
      * - `jsonLdData` - Structured data from JSON-LD scripts
      * - `techProvider` - Shopify-specific information (walletId, subDomain)
      * - `country` - Country detection results with ISO 3166-1 alpha-2 codes (e.g., "US", "GB")
-     * 
+     *
      * @throws {Error} When the store URL is unreachable or returns an error
-     * 
+     *
      * @example
      * ```typescript
      * const shop = new ShopClient('https://exampleshop.com');
      * const storeInfo = await shop.getInfo();
-     * 
+     *
      * console.log(storeInfo.name); // "Example Store"
      * console.log(storeInfo.socialLinks.instagram); // "https://instagram.com/example"
      * console.log(storeInfo.showcase.products); // ["product-handle-1", "product-handle-2"]
@@ -100,7 +100,7 @@ export function createStoreOperations(context: {
 
         const getMetaTag = (name: string) => {
           const regex = new RegExp(
-            `<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`,
+            `<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`
           );
           const match = html.match(regex);
           return match ? match[1] : null;
@@ -108,7 +108,7 @@ export function createStoreOperations(context: {
 
         const getPropertyMetaTag = (property: string) => {
           const regex = new RegExp(
-            `<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`,
+            `<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`
           );
           const match = html.match(regex);
           return match ? match[1] : null;
@@ -123,11 +123,11 @@ export function createStoreOperations(context: {
           getMetaTag("description") || getPropertyMetaTag("og:description");
 
         const shopifyWalletId = getMetaTag("shopify-digital-wallet")?.split(
-          "/",
+          "/"
         )[1];
 
         const myShopifySubdomainMatch = html.match(
-          /['"](.*?\.myshopify\.com)['"]/,
+          /['"](.*?\.myshopify\.com)['"]/
         );
         const myShopifySubdomain = myShopifySubdomainMatch
           ? myShopifySubdomainMatch[1]
@@ -138,7 +138,7 @@ export function createStoreOperations(context: {
           getPropertyMetaTag("og:image:secure_url");
         if (!logoUrl) {
           const logoMatch = html.match(
-            /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/,
+            /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/
           );
           logoUrl = logoMatch
             ? logoMatch[1].replace("http://", "https://")
@@ -176,7 +176,7 @@ export function createStoreOperations(context: {
 
         const contactRegex = new RegExp(
           "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
-          "g",
+          "g"
         );
         for (const match of html.matchAll(contactRegex)) {
           const link: string = match[1];
@@ -196,7 +196,7 @@ export function createStoreOperations(context: {
           html
             .match(/href=["']([^"']*\/products\/[^"']+)["']/g)
             ?.map((match) =>
-              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1),
+              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
             )
             ?.filter(Boolean) || [];
 
@@ -204,7 +204,7 @@ export function createStoreOperations(context: {
           html
             .match(/href=["']([^"']*\/collections\/[^"']+)["']/g)
             ?.map((match) =>
-              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1),
+              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
             )
             ?.filter(Boolean) || [];
 
@@ -213,29 +213,31 @@ export function createStoreOperations(context: {
           await Promise.all([
             context.validateLinksInBatches(
               extractedProductLinks.filter((handle): handle is string =>
-                Boolean(handle),
+                Boolean(handle)
               ),
-              (handle) => context.validateProductExists(handle),
+              (handle) => context.validateProductExists(handle)
             ),
             context.validateLinksInBatches(
               extractedCollectionLinks.filter((handle): handle is string =>
-                Boolean(handle),
+                Boolean(handle)
               ),
-              (handle) => context.validateCollectionExists(handle),
+              (handle) => context.validateCollectionExists(handle)
             ),
           ]);
 
         const jsonLd = html
           .match(
-            /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g,
+            /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g
           )
           ?.map((match) => match.split(">")[1].replace(/<\/script/g, ""));
-        const jsonLdData = jsonLd?.map((json) => JSON.parse(json));
+        const jsonLdData: JsonLdEntry[] | undefined = jsonLd?.map(
+          (json) => JSON.parse(json) as JsonLdEntry
+        );
 
         const headerLinks =
           html
             .match(
-              /<(header|nav|div|section)\b[^>]*\b(?:id|class)=["'][^"']*(?=.*shopify-section)(?=.*\b(header|navigation|nav|menu)\b)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,
+              /<(header|nav|div|section)\b[^>]*\b(?:id|class)=["'][^"']*(?=.*shopify-section)(?=.*\b(header|navigation|nav|menu)\b)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi
             )
             ?.flatMap((header) => {
               const links = header
@@ -244,7 +246,7 @@ export function createStoreOperations(context: {
                   (link) =>
                     link.includes("/products/") ||
                     link.includes("/collections/") ||
-                    link.includes("/pages/"),
+                    link.includes("/pages/")
                 );
               return (
                 links
@@ -267,8 +269,8 @@ export function createStoreOperations(context: {
                   .filter((item): item is string => Boolean(item)) ?? []
               );
             }) ?? [];
-        
-        const slug = generateStoreSlug(context.baseUrl)
+
+        const slug = generateStoreSlug(context.baseUrl);
 
         // Detect country information
         const countryDetection = await detectShopifyCountry(html);

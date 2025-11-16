@@ -1,0 +1,103 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.5/schema.json",
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 80,
+    "attributePosition": "auto"
+  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noUnusedTemplateLiteral": "off",
+        "noNonNullAssertion": "off",
+        "noParameterAssign": "off",
+        "useAsConstAssertion": "error",
+        "useDefaultParameterLast": "error",
+        "useEnumInitializers": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "useNumberNamespace": "error",
+        "noInferrableTypes": "error",
+        "noUselessElse": "error"
+      },
+      "correctness": {
+        "noChildrenProp": "off",
+        "useExhaustiveDependencies": "off",
+        "noUnsafeOptionalChaining": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useAltText": "off",
+        "useKeyWithClickEvents": "off",
+        "useAriaPropsForRole": "off",
+        "useSemanticElements": "warn",
+        "useButtonType": "off",
+        "useValidAnchor": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noExplicitAny": "off",
+        "noShadowRestrictedNames": "off",
+        "useNamespaceKeyword": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "complexity": {
+        "noForEach": "off",
+        "noBannedTypes": "off",
+        "noUselessSwitchCase": "off"
+      },
+      "performance": {
+        "noDelete": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "es5",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false,
+      "quoteStyle": "double",
+      "attributePosition": "auto"
+    }
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/node_modules",
+      "!**/.sst",
+      "!**/.open-next",
+      "!**/.next",
+      "!**/dist",
+      "!**/build",
+      "!**/bin",
+      "!**/infra",
+      "!**/sst.config.ts",
+      "!**/sst-env.d.ts",
+      "!**/routeTree.gen.ts",
+      "!**/gen-storeinfo.ts",
+      "!**/__tests__/**",
+      "!**/*.test.*",
+      "!**/*.spec.*",
+      "!packages/**/src/components/ui/**/*",
+      "!packages/**/.output/**/*",
+      "!packages/**/.nitro/**/*",
+      "!tsup.config.ts"
+    ],
+    "ignoreUnknown": true
+  }
+}

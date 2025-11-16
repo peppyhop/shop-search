@@ -355,6 +355,13 @@ type Product = {
 
 - `createdAt` and `updatedAt` are parsed using a safe parser and may be `undefined` when source values are empty or invalid.
 - `publishedAt` is `Date | null` and will be `null` when unavailable or invalid.
+
+#### Variant Options Map
+
+- Each product includes `variantOptionsMap: Record<string, string>` when variants are present.
+- Keys are composed of normalized option name/value pairs in the form `name#value`, joined by `##` and sorted alphabetically for stability.
+- Example: `{ "color#blue##size#xl": "123", "color#red##size#m": "456" }`.
+- Normalization uses `normalizeKey` (lowercases; spaces → `_`; non-space separators like `-` remain intact).
 ```
 
 ### ProductVariant

@@ -1,5 +1,17 @@
 import { filter, isNonNullish } from "remeda";
-import { Product, ShopifyProduct, ShopifySingleProduct } from "./types";
+import { StoreInfo } from "./store";
+import {
+  enrichProduct,
+  classifyProduct,
+  generateSEOContent as generateSEOContentLLM,
+} from "./utils/enrich";
+import {
+  Product,
+  ShopifyProduct,
+  ShopifySingleProduct,
+  ProductClassification,
+  SEOContent,
+} from "./types";
 
 /**
  * Interface for product operations
@@ -9,22 +21,52 @@ export interface ProductOperations {
    * Fetches all products from the store across all pages.
    */
   all(): Promise<Product[] | null>;
-  
+
   /**
    * Fetches products with pagination support.
    */
-  paginated(options?: { page?: number; limit?: number }): Promise<Product[] | null>;
-  
+  paginated(options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<Product[] | null>;
+
   /**
    * Finds a specific product by its handle.
    */
   find(productHandle: string): Promise<Product | null>;
-  
+
+  /**
+   * Finds a product by handle and enriches its content using LLM.
+   * Requires an OpenAI API key via options.apiKey or process.env.OPENAI_API_KEY.
+   */
+  enriched(
+    productHandle: string,
+    options?: {
+      apiKey?: string;
+      useGfm?: boolean;
+      inputType?: "markdown" | "html";
+      model?: string;
+      outputFormat?: "markdown" | "json";
+    }
+  ): Promise<Product | null>;
+  classify(
+    productHandle: string,
+    options?: { apiKey?: string; model?: string }
+  ): Promise<ProductClassification | null>;
+
+  /**
+   * Generate SEO and marketing content for a product.
+   */
+  generateSEOContent(
+    productHandle: string,
+    options?: { apiKey?: string; model?: string }
+  ): Promise<SEOContent | null>;
+
   /**
    * Fetches products that are showcased/featured on the store's homepage.
    */
   showcased(): Promise<Product[]>;
-  
+
   /**
    * Creates a filter map of variant options and their distinct values from all products.
    */
@@ -40,22 +82,22 @@ export function createProductOperations(
   fetchProducts: (page: number, limit: number) => Promise<Product[] | null>,
   productsDto: (products: ShopifyProduct[]) => Product[] | null,
   productDto: (product: ShopifySingleProduct) => Product,
-  getStoreInfo: () => Promise<any>,
+  getStoreInfo: () => Promise<StoreInfo>,
   findProduct: (handle: string) => Promise<Product | null>
 ): ProductOperations {
   const operations: ProductOperations = {
     /**
      * Fetches all products from the store across all pages.
-     * 
+     *
      * @returns {Promise<Product[] | null>} Array of all products or null if error occurs
-     * 
+     *
      * @throws {Error} When there's a network error or API failure
-     * 
+     *
      * @example
      * ```typescript
      * const shop = new ShopClient('https://exampleshop.com');
      * const allProducts = await shop.products.all();
-     * 
+     *
      * console.log(`Found ${allProducts?.length} products`);
      * allProducts?.forEach(product => {
      *   console.log(product.title, product.price);
@@ -96,25 +138,25 @@ export function createProductOperations(
 
     /**
      * Fetches products with pagination support.
-     * 
+     *
      * @param options - Pagination options
      * @param options.page - Page number (default: 1)
      * @param options.limit - Number of products per page (default: 250, max: 250)
-     * 
+     *
      * @returns {Promise<Product[] | null>} Array of products for the specified page or null if error occurs
-     * 
+     *
      * @throws {Error} When there's a network error or API failure
-     * 
+     *
      * @example
-   * ```typescript
-   * const shop = new ShopClient('https://example.myshopify.com');
-   * 
-   * // Get first page with default limit (250)
-   * const firstPage = await shop.products.paginated();
-   * 
-   * // Get second page with custom limit
-   * const secondPage = await shop.products.paginated({ page: 2, limit: 50 });
-   * ```
+     * ```typescript
+     * const shop = new ShopClient('https://example.myshopify.com');
+     *
+     * // Get first page with default limit (250)
+     * const firstPage = await shop.products.paginated();
+     *
+     * // Get second page with custom limit
+     * const secondPage = await shop.products.paginated({ page: 2, limit: 50 });
+     * ```
      */
     paginated: async (options?: {
       page?: number;
@@ -128,11 +170,11 @@ export function createProductOperations(
         const response = await fetch(url);
         if (!response.ok) {
           console.error(
-            `HTTP error! status: ${response.status} for ${storeDomain} page ${page}`,
+            `HTTP error! status: ${response.status} for ${storeDomain} page ${page}`
           );
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = (await response.json()) as {
           products: ShopifyProduct[];
         };
@@ -143,7 +185,7 @@ export function createProductOperations(
       } catch (error) {
         console.error(
           `Error fetching products for ${storeDomain} page ${page} with limit ${limit}:`,
-          error,
+          error
         );
         return null;
       }
@@ -151,33 +193,33 @@ export function createProductOperations(
 
     /**
      * Finds a specific product by its handle.
-     * 
+     *
      * @param productHandle - The product handle (URL slug) to search for
-     * 
+     *
      * @returns {Promise<Product | null>} The product if found, null if not found
-     * 
+     *
      * @throws {Error} When the handle is invalid or there's a network error
-     * 
+     *
      * @example
      * ```typescript
      * const shop = new ShopClient('https://exampleshop.com');
-     * 
+     *
      * // Find product by handle
      * const product = await shop.products.find('awesome-t-shirt');
-     * 
+     *
      * if (product) {
      *   console.log(product.title, product.price);
      *   console.log('Available variants:', product.variants.length);
      * }
-     * 
+     *
      * // Handle with query string
      * const productWithVariant = await shop.products.find('t-shirt?variant=123');
      * ```
      */
     find: async (productHandle: string): Promise<Product | null> => {
       // Validate product handle
-      if (!productHandle || typeof productHandle !== 'string') {
-        throw new Error('Product handle is required and must be a string');
+      if (!productHandle || typeof productHandle !== "string") {
+        throw new Error("Product handle is required and must be a string");
       }
 
       try {
@@ -189,14 +231,16 @@ export function createProductOperations(
         }
 
         // Sanitize handle - remove potentially dangerous characters
-        const sanitizedHandle = productHandle.trim().replace(/[^a-zA-Z0-9\-_]/g, '');
+        const sanitizedHandle = productHandle
+          .trim()
+          .replace(/[^a-zA-Z0-9\-_]/g, "");
         if (!sanitizedHandle) {
-          throw new Error('Invalid product handle format');
+          throw new Error("Invalid product handle format");
         }
 
         // Check handle length (reasonable limits)
         if (sanitizedHandle.length > 255) {
-          throw new Error('Product handle is too long');
+          throw new Error("Product handle is too long");
         }
 
         const url = `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}.js${qs ? `?${qs}` : ""}`;
@@ -217,7 +261,7 @@ export function createProductOperations(
           console.error(
             `Error fetching product ${productHandle}:`,
             baseUrl,
-            error.message,
+            error.message
           );
         }
         throw error;
@@ -225,48 +269,175 @@ export function createProductOperations(
     },
 
     /**
+     * Enrich a product by generating merged markdown from body_html and product page.
+     * Adds `enriched_content` to the returned product.
+     */
+    enriched: async (
+      productHandle: string,
+      options?: {
+        apiKey?: string;
+        useGfm?: boolean;
+        inputType?: "markdown" | "html";
+        model?: string;
+        outputFormat?: "markdown" | "json";
+      }
+    ): Promise<Product | null> => {
+      if (!productHandle || typeof productHandle !== "string") {
+        throw new Error("Product handle is required and must be a string");
+      }
+
+      const apiKey = options?.apiKey || process.env.OPENROUTER_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "Missing OpenRouter API key. Pass options.apiKey or set OPENROUTER_API_KEY."
+        );
+      }
+
+      // Reuse find() for validation and normalized product
+      const baseProduct = await operations.find(productHandle);
+      if (!baseProduct) {
+        return null;
+      }
+
+      // Use the normalized handle from the found product
+      const handle = baseProduct.handle;
+      const enriched = await enrichProduct(storeDomain, handle, {
+        apiKey,
+        useGfm: options?.useGfm,
+        inputType: options?.inputType,
+        model: options?.model,
+        outputFormat: options?.outputFormat,
+      });
+
+      return {
+        ...baseProduct,
+        enriched_content: enriched.mergedMarkdown,
+      };
+    },
+    classify: async (
+      productHandle: string,
+      options?: { apiKey?: string; model?: string }
+    ): Promise<ProductClassification | null> => {
+      if (!productHandle || typeof productHandle !== "string") {
+        throw new Error("Product handle is required and must be a string");
+      }
+      const apiKey = options?.apiKey || process.env.OPENROUTER_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "Missing OpenRouter API key. Pass options.apiKey or set OPENROUTER_API_KEY."
+        );
+      }
+      const enrichedProduct = await operations.enriched(productHandle, {
+        apiKey,
+        inputType: "html",
+        model: options?.model,
+        outputFormat: "json",
+      });
+      if (!enrichedProduct || !enrichedProduct.enriched_content) return null;
+
+      let productContent = enrichedProduct.enriched_content;
+      try {
+        const obj = JSON.parse(enrichedProduct.enriched_content);
+        const lines: string[] = [];
+        if (obj.title && typeof obj.title === "string")
+          lines.push(`Title: ${obj.title}`);
+        if (obj.description && typeof obj.description === "string")
+          lines.push(`Description: ${obj.description}`);
+        if (Array.isArray(obj.materials) && obj.materials.length)
+          lines.push(`Materials: ${obj.materials.join(", ")}`);
+        if (Array.isArray(obj.care) && obj.care.length)
+          lines.push(`Care: ${obj.care.join(", ")}`);
+        if (obj.fit && typeof obj.fit === "string")
+          lines.push(`Fit: ${obj.fit}`);
+        if (obj.returnPolicy && typeof obj.returnPolicy === "string")
+          lines.push(`ReturnPolicy: ${obj.returnPolicy}`);
+        productContent = lines.join("\n");
+      } catch {
+        // keep as-is if not JSON
+      }
+
+      const classification = await classifyProduct(productContent, {
+        apiKey,
+        model: options?.model,
+      });
+      return classification;
+    },
+
+    generateSEOContent: async (
+      productHandle: string,
+      options?: { apiKey?: string; model?: string }
+    ): Promise<SEOContent | null> => {
+      if (!productHandle || typeof productHandle !== "string") {
+        throw new Error("Product handle is required and must be a string");
+      }
+      const apiKey = options?.apiKey || process.env.OPENROUTER_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "Missing OpenRouter API key. Pass options.apiKey or set OPENROUTER_API_KEY."
+        );
+      }
+
+      const baseProduct = await operations.find(productHandle);
+      if (!baseProduct) return null;
+
+      const payload = {
+        title: baseProduct.title,
+        description: baseProduct.bodyHtml || undefined,
+        vendor: baseProduct.vendor,
+        price: baseProduct.price,
+        tags: baseProduct.tags,
+      };
+
+      const seo = await generateSEOContentLLM(payload, {
+        apiKey,
+        model: options?.model,
+      });
+      return seo;
+    },
+
+    /**
      * Fetches products that are showcased/featured on the store's homepage.
-     * 
+     *
      * @returns {Promise<Product[]>} Array of showcased products found on the homepage
-     * 
+     *
      * @throws {Error} When there's a network error or API failure
-     * 
+     *
      * @example
-   * ```typescript
-   * const shop = new ShopClient('https://exampleshop.com');
-   * const showcasedProducts = await shop.products.showcased();
-   * 
-   * console.log(`Found ${showcasedProducts.length} showcased products`);
-   * showcasedProducts.forEach(product => {
-   *   console.log(`Featured: ${product.title} - ${product.price}`);
-   * });
-   * ```
+     * ```typescript
+     * const shop = new ShopClient('https://exampleshop.com');
+     * const showcasedProducts = await shop.products.showcased();
+     *
+     * console.log(`Found ${showcasedProducts.length} showcased products`);
+     * showcasedProducts.forEach(product => {
+     *   console.log(`Featured: ${product.title} - ${product.price}`);
+     * });
+     * ```
      */
     showcased: async () => {
       const storeInfo = await getStoreInfo();
       const products = await Promise.all(
         storeInfo.showcase.products.map((productHandle: string) =>
-          findProduct(productHandle),
-        ),
+          findProduct(productHandle)
+        )
       );
       return filter(products, isNonNullish);
     },
 
     /**
      * Creates a filter map of variant options and their distinct values from all products.
-     * 
+     *
      * @returns {Promise<Record<string, string[]> | null>} Map of option names to their distinct values or null if error occurs
-     * 
+     *
      * @throws {Error} When there's a network error or API failure
-     * 
+     *
      * @example
      * ```typescript
      * const shop = new ShopClient('https://exampleshop.com');
      * const filters = await shop.products.filter();
-     * 
+     *
      * console.log('Available filters:', filters);
      * // Output: { "Size": ["S", "M", "L", "XL"], "Color": ["Red", "Blue", "Green"] }
-     * 
+     *
      * // Use filters for UI components
      * Object.entries(filters || {}).forEach(([optionName, values]) => {
      *   console.log(`${optionName}: ${values.join(', ')}`);
@@ -285,44 +456,52 @@ export function createProductOperations(
         const filterMap: Record<string, Set<string>> = {};
 
         // Process each product and its variants
-        products.forEach(product => {
+        products.forEach((product) => {
           if (product.variants && product.variants.length > 0) {
             // Process product options
             if (product.options && product.options.length > 0) {
-              product.options.forEach(option => {
+              product.options.forEach((option) => {
                 const lowercaseOptionName = option.name.toLowerCase();
                 if (!filterMap[lowercaseOptionName]) {
                   filterMap[lowercaseOptionName] = new Set();
                 }
                 // Add all values from this option (converted to lowercase)
-                option.values.forEach(value => {
+                option.values.forEach((value) => {
                   if (value && value.trim()) {
-                    filterMap[lowercaseOptionName].add(value.trim().toLowerCase());
+                    filterMap[lowercaseOptionName].add(
+                      value.trim().toLowerCase()
+                    );
                   }
                 });
               });
             }
 
             // Also process individual variant options as fallback
-            product.variants.forEach(variant => {
+            product.variants.forEach((variant) => {
               if (variant.option1) {
-                const optionName = (product.options?.[0]?.name || 'Option 1').toLowerCase();
+                const optionName = (
+                  product.options?.[0]?.name || "Option 1"
+                ).toLowerCase();
                 if (!filterMap[optionName]) {
                   filterMap[optionName] = new Set();
                 }
                 filterMap[optionName].add(variant.option1.trim().toLowerCase());
               }
-              
+
               if (variant.option2) {
-                const optionName = (product.options?.[1]?.name || 'Option 2').toLowerCase();
+                const optionName = (
+                  product.options?.[1]?.name || "Option 2"
+                ).toLowerCase();
                 if (!filterMap[optionName]) {
                   filterMap[optionName] = new Set();
                 }
                 filterMap[optionName].add(variant.option2.trim().toLowerCase());
               }
-              
+
               if (variant.option3) {
-                const optionName = (product.options?.[2]?.name || 'Option 3').toLowerCase();
+                const optionName = (
+                  product.options?.[2]?.name || "Option 3"
+                ).toLowerCase();
                 if (!filterMap[optionName]) {
                   filterMap[optionName] = new Set();
                 }
@@ -345,6 +524,6 @@ export function createProductOperations(
       }
     },
   };
-  
+
   return operations;
 }
