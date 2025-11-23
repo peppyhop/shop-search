@@ -1,6 +1,6 @@
 import { filter, isNonNullish } from "remeda";
-import { StoreInfo } from "./store";
-import { Collection, Product, ShopifyCollection } from "./types";
+import type { StoreInfo } from "./store";
+import type { Collection, Product, ShopifyCollection } from "./types";
 
 /**
  * Interface for collection operations
@@ -79,7 +79,7 @@ export function createCollectionOperations(
      */
     all: async (): Promise<Collection[]> => {
       const limit = 250;
-      let allCollections: Collection[] = [];
+      const allCollections: Collection[] = [];
 
       async function fetchAll() {
         let currentPage = 1;
@@ -352,7 +352,7 @@ export function createCollectionOperations(
 
         try {
           const limit = 250;
-          let allProducts: Product[] = [];
+          const allProducts: Product[] = [];
 
           let currentPage = 1;
 

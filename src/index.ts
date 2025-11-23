@@ -1,18 +1,19 @@
 import { unique } from "remeda";
-import { CheckoutOperations, createCheckoutOperations } from "./checkout";
-import {
-  CollectionOperations,
-  createCollectionOperations,
-} from "./collections";
-import { createProductOperations, ProductOperations } from "./products";
-import { createStoreOperations, StoreInfo, StoreOperations } from "./store";
-import type { StoreTypeBreakdown } from "./types";
-import {
+import type { CheckoutOperations } from "./checkout";
+import { createCheckoutOperations } from "./checkout";
+import type { CollectionOperations } from "./collections";
+import { createCollectionOperations } from "./collections";
+import type { ProductOperations } from "./products";
+import { createProductOperations } from "./products";
+import type { StoreInfo, StoreOperations } from "./store";
+import { createStoreOperations } from "./store";
+import type {
   Collection,
   Product,
   ShopifyCollection,
   ShopifyProduct,
   ShopifySingleProduct,
+  StoreTypeBreakdown,
 } from "./types";
 import { detectShopifyCountry } from "./utils/detect-country";
 import {
@@ -47,10 +48,8 @@ export class ShopClient {
   private validationCache: Map<string, boolean> = new Map(); // Simple cache for validation results
   private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes cache expiry
   private cacheTimestamps: Map<string, number> = new Map();
-
-  // Cache frequently used values to avoid recalculation
-  private storeSlug: string;
   private normalizeImageUrlCache: Map<string, string> = new Map();
+  private storeSlug: string;
   private storeOperations: StoreOperations;
 
   // Public operations interfaces
@@ -96,7 +95,7 @@ export class ShopClient {
     let storeUrl: URL;
     try {
       storeUrl = new URL(normalizedUrl);
-    } catch (error) {
+    } catch (_error) {
       throw new Error("Invalid store URL format");
     }
 
@@ -194,27 +193,6 @@ export class ShopClient {
   }
 
   /**
-   * Calculate price statistics for variants
-   */
-  private calculatePriceStats(variants: any[], priceField: string) {
-    const prices = variants
-      .map((variant) => Number.parseFloat(variant[priceField]))
-      .filter((price) => !Number.isNaN(price));
-
-    if (prices.length === 0) {
-      return { min: "0.00", max: "0.00" };
-    }
-
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-
-    return {
-      min: minPrice.toFixed(2),
-      max: maxPrice.toFixed(2),
-    };
-  }
-
-  /**
    * Transform Shopify products to our Product format
    */
   productsDto(products: ShopifyProduct[]): Product[] | null {
@@ -227,6 +205,73 @@ export class ShopClient {
         optionNames,
         product.variants
       );
+      // Map variants once and reuse for price stats and output
+      const mappedVariants = product.variants.map((variant) => ({
+        id: variant.id.toString(),
+        platformId: variant.id.toString(),
+        name: variant.name,
+        title: variant.title,
+        option1: variant.option1 || null,
+        option2: variant.option2 || null,
+        option3: variant.option3 || null,
+        options: [variant.option1, variant.option2, variant.option3].filter(
+          Boolean
+        ) as string[],
+        sku: variant.sku || null,
+        requiresShipping: variant.requires_shipping,
+        taxable: variant.taxable,
+        featuredImage: variant.featured_image
+          ? {
+              id: variant.featured_image.id,
+              src: variant.featured_image.src,
+              width: variant.featured_image.width,
+              height: variant.featured_image.height,
+              position: variant.featured_image.position,
+              productId: variant.featured_image.product_id,
+              aspectRatio: variant.featured_image.aspect_ratio,
+              variantIds: variant.featured_image.variant_ids || [],
+              createdAt: variant.featured_image.created_at,
+              updatedAt: variant.featured_image.updated_at,
+              alt: variant.featured_image.alt,
+            }
+          : null,
+        available: variant.available,
+        price:
+          typeof variant.price === "string"
+            ? Number.parseFloat(variant.price) * 100
+            : variant.price,
+        weightInGrams: variant.weightInGrams,
+        compareAtPrice: variant.compare_at_price
+          ? typeof variant.compare_at_price === "string"
+            ? Number.parseFloat(variant.compare_at_price) * 100
+            : variant.compare_at_price
+          : 0,
+        position: variant.position,
+        productId: variant.product_id,
+        createdAt: variant.created_at,
+        updatedAt: variant.updated_at,
+      }));
+
+      // Precompute price arrays once
+      const priceValues = mappedVariants
+        .map((v) => v.price)
+        .filter((p) => typeof p === "number" && !Number.isNaN(p));
+      const compareAtValues = mappedVariants
+        .map((v) => v.compareAtPrice || 0)
+        .filter((p) => typeof p === "number" && !Number.isNaN(p));
+
+      const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
+      const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
+      const priceVaries = mappedVariants.length > 1 && priceMin !== priceMax;
+
+      const compareAtMin = compareAtValues.length
+        ? Math.min(...compareAtValues)
+        : 0;
+      const compareAtMax = compareAtValues.length
+        ? Math.max(...compareAtValues)
+        : 0;
+      const compareAtVaries =
+        mappedVariants.length > 1 && compareAtMin !== compareAtMax;
 
       return {
         slug: genProductSlug({
@@ -236,75 +281,15 @@ export class ShopClient {
         handle: product.handle,
         platformId: product.id.toString(),
         title: product.title,
-        available: product.variants.some((v) => v.available),
-        price: Math.min(
-          ...product.variants.map((v) =>
-            typeof v.price === "string"
-              ? Number.parseFloat(v.price) * 100
-              : v.price
-          )
-        ),
-        priceMin: Math.min(
-          ...product.variants.map((v) =>
-            typeof v.price === "string"
-              ? Number.parseFloat(v.price) * 100
-              : v.price
-          )
-        ),
-        priceMax: Math.max(
-          ...product.variants.map((v) =>
-            typeof v.price === "string"
-              ? Number.parseFloat(v.price) * 100
-              : v.price
-          )
-        ),
-        priceVaries:
-          product.variants.length > 1 &&
-          new Set(
-            product.variants.map((v) =>
-              typeof v.price === "string"
-                ? Number.parseFloat(v.price) * 100
-                : v.price
-            )
-          ).size > 1,
-        compareAtPrice: Math.min(
-          ...product.variants.map((v) =>
-            v.compare_at_price
-              ? typeof v.compare_at_price === "string"
-                ? Number.parseFloat(v.compare_at_price) * 100
-                : v.compare_at_price
-              : 0
-          )
-        ),
-        compareAtPriceMin: Math.min(
-          ...product.variants.map((v) =>
-            v.compare_at_price
-              ? typeof v.compare_at_price === "string"
-                ? Number.parseFloat(v.compare_at_price) * 100
-                : v.compare_at_price
-              : 0
-          )
-        ),
-        compareAtPriceMax: Math.max(
-          ...product.variants.map((v) =>
-            v.compare_at_price
-              ? typeof v.compare_at_price === "string"
-                ? Number.parseFloat(v.compare_at_price) * 100
-                : v.compare_at_price
-              : 0
-          )
-        ),
-        compareAtPriceVaries:
-          product.variants.length > 1 &&
-          new Set(
-            product.variants.map((v) =>
-              v.compare_at_price
-                ? typeof v.compare_at_price === "string"
-                  ? Number.parseFloat(v.compare_at_price) * 100
-                  : v.compare_at_price
-                : 0
-            )
-          ).size > 1,
+        available: mappedVariants.some((v) => v.available),
+        price: priceMin,
+        priceMin: priceMin,
+        priceMax: priceMax,
+        priceVaries,
+        compareAtPrice: compareAtMin,
+        compareAtPriceMin: compareAtMin,
+        compareAtPriceMax: compareAtMax,
+        compareAtPriceVaries: compareAtVaries,
         discount: 0, // Calculate if needed
         currency: "USD", // Default or extract from store
         options: product.options.map((option) => ({
@@ -327,51 +312,7 @@ export class ShopClient {
         isProxyFeaturedImage: false,
         createdAt: safeParseDate(product.created_at),
         updatedAt: safeParseDate(product.updated_at),
-        variants: product.variants.map((variant) => ({
-          id: variant.id.toString(),
-          platformId: variant.id.toString(),
-          name: variant.name,
-          title: variant.title,
-          option1: variant.option1 || null,
-          option2: variant.option2 || null,
-          option3: variant.option3 || null,
-          options: [variant.option1, variant.option2, variant.option3].filter(
-            Boolean
-          ) as string[],
-          sku: variant.sku || null,
-          requiresShipping: variant.requires_shipping,
-          taxable: variant.taxable,
-          featuredImage: variant.featured_image
-            ? {
-                id: variant.featured_image.id,
-                src: variant.featured_image.src,
-                width: variant.featured_image.width,
-                height: variant.featured_image.height,
-                position: variant.featured_image.position,
-                productId: variant.featured_image.product_id,
-                aspectRatio: variant.featured_image.aspect_ratio,
-                variantIds: variant.featured_image.variant_ids || [],
-                createdAt: variant.featured_image.created_at,
-                updatedAt: variant.featured_image.updated_at,
-                alt: variant.featured_image.alt,
-              }
-            : null,
-          available: variant.available,
-          price:
-            typeof variant.price === "string"
-              ? Number.parseFloat(variant.price) * 100
-              : variant.price, // Convert string prices from dollars to cents
-          weightInGrams: variant.weightInGrams,
-          compareAtPrice: variant.compare_at_price
-            ? typeof variant.compare_at_price === "string"
-              ? Number.parseFloat(variant.compare_at_price) * 100
-              : variant.compare_at_price
-            : 0, // Convert string prices from dollars to cents
-          position: variant.position,
-          productId: variant.product_id,
-          createdAt: variant.created_at,
-          updatedAt: variant.updated_at,
-        })),
+        variants: mappedVariants,
         images: product.images.map((image) => ({
           id: image.id,
           productId: image.product_id,
@@ -672,7 +613,7 @@ export class ShopClient {
 
       this.setCacheValue(cacheKey, exists);
       return exists;
-    } catch (error) {
+    } catch (_error) {
       this.setCacheValue(cacheKey, false);
       return false;
     }
@@ -695,7 +636,7 @@ export class ShopClient {
 
       this.setCacheValue(cacheKey, exists);
       return exists;
-    } catch (error) {
+    } catch (_error) {
       this.setCacheValue(cacheKey, false);
       return false;
     }
@@ -868,22 +809,17 @@ export class ShopClient {
         contactPage: null as string | null,
       };
 
-      const contactRegex = new RegExp(
-        "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
-        "g"
-      );
-      for (const match of html.matchAll(contactRegex)) {
-        const link: string = match[1];
-        if (link.startsWith("tel:")) {
-          contactLinks.tel = link.replace("tel:", "").trim();
-        } else if (link.startsWith("mailto:")) {
-          contactLinks.email = link.replace("mailto:", "").trim();
-        } else if (
-          link.includes("/contact") ||
-          link.includes("/pages/contact")
-        ) {
-          contactLinks.contactPage = link;
-        }
+      // Extract contact details using focused regexes to avoid parser pitfalls
+      for (const match of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
+        contactLinks.tel = match[1].trim();
+      }
+      for (const match of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
+        contactLinks.email = match[1].trim();
+      }
+      for (const match of html.matchAll(
+        /href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g
+      )) {
+        contactLinks.contactPage = match[1];
       }
 
       const extractedProductLinks =
@@ -1061,7 +997,7 @@ export class ShopClient {
 
       const validProducts = showcasedProducts.filter((p): p is Product =>
         Boolean(
-          p && p.bodyHtml && typeof p.bodyHtml === "string" && p.bodyHtml.trim()
+          p?.bodyHtml && typeof p.bodyHtml === "string" && p.bodyHtml.trim()
         )
       );
 

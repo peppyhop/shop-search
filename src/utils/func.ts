@@ -88,7 +88,7 @@ export function sanitizeDomain(
     let hostname = raw.toLowerCase();
     hostname = hostname.replace(/^[a-z]+:\/\//, ""); // remove protocol if present
     hostname = hostname.replace(/^\/\//, ""); // remove protocol-relative
-    hostname = hostname.replace(/[\/:#?].*$/, ""); // remove path/query/fragment/port
+    hostname = hostname.replace(/[/:#?].*$/, ""); // remove path/query/fragment/port
     if (stripWWW) hostname = hostname.replace(/^www\./, "");
     const parsed = parse(hostname);
     return (parsed.domain ?? hostname) || hostname;
@@ -141,7 +141,7 @@ export function buildVariantOptionsMap(
 
     if (parts.length > 0) {
       // Ensure deterministic alphabetical ordering of parts
-      parts.sort((a, b) => a.localeCompare(b));
+      if (parts.length > 1) parts.sort();
       const key = parts.join("##");
       const id = v.id.toString();
       // First-write wins: do not override if key already exists

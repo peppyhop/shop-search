@@ -114,7 +114,7 @@ export async function detectShopifyCountry(
             );
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently handle JSON parsing errors
     }
   }
@@ -151,11 +151,9 @@ export async function detectShopifyCountry(
         }
         if (node && typeof node === "object") {
           const obj = node as Record<string, unknown>;
-          const address = obj["address"];
+          const address = obj.address;
           if (address && typeof address === "object") {
-            const country = (address as Record<string, unknown>)[
-              "addressCountry"
-            ];
+            const country = (address as Record<string, unknown>).addressCountry;
             if (typeof country === "string") results.push(country);
           }
           // Support nested graphs
@@ -169,7 +167,7 @@ export async function detectShopifyCountry(
       for (const country of countries) {
         scoreCountry(countryScores, country, 1, "JSON-LD addressCountry");
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently handle JSON parsing errors
     }
     // advance to next match

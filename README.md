@@ -279,6 +279,13 @@ Notes:
 - `sanitizeDomain` trims protocols, paths, and optional `www.` depending on `stripWWW`.
 - `safeParseDate` returns `undefined` for invalid inputs; product `publishedAt` may be `null` when unavailable.
 
+#### Release and Publishing
+
+- Releases are automated via `semantic-release` and npm Trusted Publishing.
+- The release workflow uses Node.js `22.14.0` to satisfy `semantic-release` requirements.
+- npm publishes use OIDC with provenance; no `NPM_TOKEN` secret is required.
+- Ensure your npm package settings add this GitHub repo as a trusted publisher and set the environment name to `npm-publish`.
+
 ### Store Type Classification
 
 Determine the store’s primary verticals and target audiences using showcased products. Classification uses only each product’s `body_html` content and aggregates per-product results, optionally pruned by store-level signals.

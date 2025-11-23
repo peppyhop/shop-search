@@ -92,6 +92,15 @@ Shared functionality used across modules.
 - Fallback mechanisms for edge cases
 - Support for custom domains
 
+**func.ts:**
+- `sanitizeDomain(input, opts?)`: Normalizes domains by stripping protocol, paths, query, fragment, and ports; lowercases; strips `www.` by default (configurable).
+- `safeParseDate(input?)`: Safely parses date strings, returning `undefined` when invalid. Use `|| null` where nullability is expected.
+- Variant helpers: `normalizeKey`, `buildVariantOptionsMap`, `buildVariantKey` create stable variant option keys (`name#value` parts sorted and joined with `##`).
+
+Domain normalization policy:
+- Store info uses `sanitizeDomain` to present a registrable domain without paths/ports.
+- Image URLs preserve protocol-relative forms (normalized to `https:`) but do not alter host/path.
+
 ## Data Structures
 
 ### Product Type
@@ -193,6 +202,10 @@ Key type hierarchies:
 - Social media presence
 - Navigation structure
 - Featured content (products, collections)
+
+**Normalization Notes:**
+- `domain` in `StoreInfo` is normalized via `sanitizeDomain`.
+- Dates (`createdAt`, `updatedAt`, `publishedAt`) are parsed with `safeParseDate`; invalid inputs become `undefined` or `null` per field.
 
 ### Checkout Module (`src/checkout.ts`)
 

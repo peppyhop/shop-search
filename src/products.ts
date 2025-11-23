@@ -106,7 +106,7 @@ export function createProductOperations(
      */
     all: async (): Promise<Product[] | null> => {
       const limit = 250;
-      let allProducts: Product[] = [];
+      const allProducts: Product[] = [];
 
       async function fetchAll() {
         let currentPage = 1;
@@ -467,7 +467,7 @@ export function createProductOperations(
                 }
                 // Add all values from this option (converted to lowercase)
                 option.values.forEach((value) => {
-                  if (value && value.trim()) {
+                  if (value?.trim()) {
                     filterMap[lowercaseOptionName].add(
                       value.trim().toLowerCase()
                     );

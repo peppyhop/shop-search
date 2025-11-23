@@ -4,7 +4,7 @@ This document explains the automated versioning and publishing setup for the `sh
 
 ## 🚀 Automated Release Process
 
-This project uses **semantic-release** for automated versioning and publishing based on conventional commits.
+This project uses **semantic-release** for automated versioning and publishing based on conventional commits, with npm Trusted Publishing and provenance enabled.
 
 ### How It Works
 
@@ -46,20 +46,30 @@ These commit types **do not** trigger releases:
 
 ## 🔧 Setup Requirements
 
-### 1. NPM Token Configuration
+### 1. Node.js Version
 
-1. Generate an NPM automation token:
-   ```bash
-   npm token create --type=automation
-   ```
-
-2. Add the token to GitHub repository secrets:
-   - Go to repository Settings → Secrets and variables → Actions
-   - Add new secret: `NPM_TOKEN` with your token value
+- Release workflow runs on Node.js `22.14.0` to satisfy semantic-release requirements (`^22.14.0` or `>= 24.10.0`).
+- Local development can use the version in `.nvmrc`.
 
 ### 2. GitHub Token
 
-The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
+- The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
+- Permissions are configured in the workflow for publishing and release notes.
+
+### 3. npm Trusted Publishing
+
+This repository uses npm Trusted Publishing with provenance. No `NPM_TOKEN` is required.
+
+Steps to configure in npm:
+- Go to npm package settings → Access → Trusted publishers
+- Add the GitHub repository as a trusted publisher
+- Set environment name to `npm-publish` (matches the workflow environment)
+- Enable “Require provenance” for publishes
+
+Workflow configuration highlights:
+- Grants `id-token: write` to obtain an OIDC token for npm
+- Sets `NPM_CONFIG_PROVENANCE=true` during publish
+- Uses the `npm-publish` environment with protections as needed
 
 ## 🌟 Workflow Overview
 
@@ -72,6 +82,8 @@ The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
 - Runs on pushes to `main` and `beta` branches
 - Tests and builds the project
 - Runs semantic-release for automated publishing
+- Uses Node.js `22.14.0`
+- Publishes to npm via Trusted Publishing (OIDC) with provenance
 
 ## 📦 Release Branches
 
@@ -111,23 +123,22 @@ The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
 
 ## 🛠️ Manual Release (Emergency)
 
-If needed, you can trigger a manual release:
+If needed, you can trigger a manual release locally for diagnostics:
 
 ```bash
-npm run semantic-release
+npx semantic-release --dry-run
 ```
 
-**Note**: Ensure you have the required environment variables set:
-- `GITHUB_TOKEN`
-- `NPM_TOKEN`
+Publishing to npm requires the GitHub Actions workflow with OIDC. Manual local publishes should not be used; rely on Trusted Publishing via CI.
 
 ## 📋 Troubleshooting
 
 ### Common Issues
 
 1. **Release not triggered**: Check commit message format
-2. **NPM publish fails**: Verify NPM_TOKEN secret is set correctly
-3. **Tests fail**: Ensure all tests pass before merging to main
+2. **npm publish blocked**: Verify Trusted Publisher setup and environment name `npm-publish`
+3. **Provenance required**: Ensure `NPM_CONFIG_PROVENANCE=true` and npm package requires provenance
+4. **Tests fail**: Ensure all tests pass before merging to main
 
 ### Debug Commands
 
