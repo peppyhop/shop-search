@@ -28,6 +28,13 @@ The main orchestrator class that provides a unified interface to all library fun
 - Lazy-loads operation modules for better performance
 - Provides consistent error handling across all operations
 
+**Store Type Classification:**
+- Method: `determineStoreType(options?)`
+- Classifies showcased products using only `product.bodyHtml` (no images or external text).
+- Aggregates per-product results into a multi-audience breakdown of verticals.
+- Online mode requires `OPENROUTER_API_KEY`; otherwise falls back to regex heuristics.
+- Applies pruning based on store-level signals (title and description) for consistency.
+
 ### 2. ProductOperations (`src/products.ts`)
 Handles all product-related operations with support for various retrieval patterns.
 

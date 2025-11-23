@@ -15,6 +15,7 @@
 - **Type-Safe**: Written in TypeScript with comprehensive type definitions
 - **Performance Optimized**: Efficient data fetching with built-in error handling
 - **Zero Dependencies**: Lightweight with minimal external dependencies
+- **Store Type Classification**: Infers audience and verticals from showcased products (body_html-only)
 
 ## 📦 Installation
 
@@ -278,6 +279,41 @@ Notes:
 - `sanitizeDomain` trims protocols, paths, and optional `www.` depending on `stripWWW`.
 - `safeParseDate` returns `undefined` for invalid inputs; product `publishedAt` may be `null` when unavailable.
 
+### Store Type Classification
+
+Determine the store’s primary verticals and target audiences using showcased products. Classification uses only each product’s `body_html` content and aggregates per-product results, optionally pruned by store-level signals.
+
+```typescript
+import { ShopClient } from 'shop-search';
+
+const shop = new ShopClient('your-store-domain.com');
+
+const breakdown = await shop.determineStoreType({
+  // Optional: provide an OpenRouter API key for online classification
+  // Offline mode falls back to regex heuristics if no key is set
+  apiKey: process.env.OPENROUTER_API_KEY,
+  // Optional: model name when using online classification
+  model: 'openai/gpt-4o-mini',
+  // Optional: limit the number of showcased products sampled (default 10, max 50)
+  maxShowcaseProducts: 12,
+  // Note: showcased collections are not used for classification
+  maxShowcaseCollections: 0,
+});
+
+// Example breakdown shape
+// {
+//   generic: { accessories: ['general'] },
+//   adult_female: { clothing: ['dresses', 'tops'] }
+// }
+```
+
+Details:
+- Uses only `product.bodyHtml` for classification (no images or external text).
+- Samples up to `maxShowcaseProducts` from `getInfo().showcase.products`.
+- Aggregates per-product audience/vertical into a multi-audience breakdown.
+- If `OPENROUTER_API_KEY` is absent or `OPENROUTER_OFFLINE=1`, uses offline regex heuristics.
+- Applies store-level pruning based on title/description to improve consistency.
+
 ## 🏗️ Type Definitions
 
 ### StoreInfo
@@ -313,7 +349,7 @@ type StoreInfo = {
 type Product = {
   slug: string;
   handle: string;
-  platformId: string | null;
+  platformId: string;
   title: string;
   available: boolean;
   price: number;
@@ -349,6 +385,8 @@ type Product = {
   url: string;
   requiresSellingPlan?: boolean | null;
   sellingPlanGroups?: unknown;
+  // Keys formatted as name#value parts joined by '##' (alphabetically sorted), e.g., "color#blue##size#xl"
+  variantOptionsMap: Record<string, string>;
 };
 
 #### Date Handling
@@ -369,7 +407,7 @@ type Product = {
 ```typescript
 type ProductVariant = {
   id: string;
-  platformId?: string;
+  platformId: string;
   name?: string;
   title: string;
   option1: string | null;

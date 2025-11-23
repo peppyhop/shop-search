@@ -192,22 +192,28 @@ describe("Utility Functions", () => {
       expect(sanitizeDomain("http://sub.example.co.uk/something")).toBe(
         "example.co.uk"
       );
+      expect(sanitizeDomain("https://example.com/")).toBe("example.com");
     });
 
     test("handles protocol-relative and bare hostnames", () => {
       expect(sanitizeDomain("//Example.com")).toBe("example.com");
       expect(sanitizeDomain("www.example.com")).toBe("example.com");
       expect(sanitizeDomain("EXAMPLE.CO.UK")).toBe("example.co.uk");
+      expect(sanitizeDomain("example.com/")).toBe("example.com");
     });
 
     test("strips ports, paths, query and fragments", () => {
       expect(sanitizeDomain("example.com:8080")).toBe("example.com");
       expect(sanitizeDomain("example.com/path/to#frag")).toBe("example.com");
       expect(sanitizeDomain("example.com?utm=1")).toBe("example.com");
+      expect(sanitizeDomain("www.example.com/?q=1")).toBe("example.com");
     });
 
     test("respects stripWWW option", () => {
       expect(sanitizeDomain("www.example.com", { stripWWW: false })).toBe(
+        "www.example.com"
+      );
+      expect(sanitizeDomain("www.example.com/", { stripWWW: false })).toBe(
         "www.example.com"
       );
     });

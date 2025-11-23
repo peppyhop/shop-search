@@ -22,6 +22,7 @@ import {
   genProductSlug,
   normalizeKey,
   safeParseDate,
+  sanitizeDomain,
 } from "./utils/func";
 
 /**
@@ -197,8 +198,8 @@ export class ShopClient {
    */
   private calculatePriceStats(variants: any[], priceField: string) {
     const prices = variants
-      .map((variant) => parseFloat(variant[priceField]))
-      .filter((price) => !isNaN(price));
+      .map((variant) => Number.parseFloat(variant[priceField]))
+      .filter((price) => !Number.isNaN(price));
 
     if (prices.length === 0) {
       return { min: "0.00", max: "0.00" };
@@ -238,31 +239,39 @@ export class ShopClient {
         available: product.variants.some((v) => v.available),
         price: Math.min(
           ...product.variants.map((v) =>
-            typeof v.price === "string" ? parseFloat(v.price) * 100 : v.price
+            typeof v.price === "string"
+              ? Number.parseFloat(v.price) * 100
+              : v.price
           )
         ),
         priceMin: Math.min(
           ...product.variants.map((v) =>
-            typeof v.price === "string" ? parseFloat(v.price) * 100 : v.price
+            typeof v.price === "string"
+              ? Number.parseFloat(v.price) * 100
+              : v.price
           )
         ),
         priceMax: Math.max(
           ...product.variants.map((v) =>
-            typeof v.price === "string" ? parseFloat(v.price) * 100 : v.price
+            typeof v.price === "string"
+              ? Number.parseFloat(v.price) * 100
+              : v.price
           )
         ),
         priceVaries:
           product.variants.length > 1 &&
           new Set(
             product.variants.map((v) =>
-              typeof v.price === "string" ? parseFloat(v.price) * 100 : v.price
+              typeof v.price === "string"
+                ? Number.parseFloat(v.price) * 100
+                : v.price
             )
           ).size > 1,
         compareAtPrice: Math.min(
           ...product.variants.map((v) =>
             v.compare_at_price
               ? typeof v.compare_at_price === "string"
-                ? parseFloat(v.compare_at_price) * 100
+                ? Number.parseFloat(v.compare_at_price) * 100
                 : v.compare_at_price
               : 0
           )
@@ -271,7 +280,7 @@ export class ShopClient {
           ...product.variants.map((v) =>
             v.compare_at_price
               ? typeof v.compare_at_price === "string"
-                ? parseFloat(v.compare_at_price) * 100
+                ? Number.parseFloat(v.compare_at_price) * 100
                 : v.compare_at_price
               : 0
           )
@@ -280,7 +289,7 @@ export class ShopClient {
           ...product.variants.map((v) =>
             v.compare_at_price
               ? typeof v.compare_at_price === "string"
-                ? parseFloat(v.compare_at_price) * 100
+                ? Number.parseFloat(v.compare_at_price) * 100
                 : v.compare_at_price
               : 0
           )
@@ -291,7 +300,7 @@ export class ShopClient {
             product.variants.map((v) =>
               v.compare_at_price
                 ? typeof v.compare_at_price === "string"
-                  ? parseFloat(v.compare_at_price) * 100
+                  ? Number.parseFloat(v.compare_at_price) * 100
                   : v.compare_at_price
                 : 0
             )
@@ -350,12 +359,12 @@ export class ShopClient {
           available: variant.available,
           price:
             typeof variant.price === "string"
-              ? parseFloat(variant.price) * 100
+              ? Number.parseFloat(variant.price) * 100
               : variant.price, // Convert string prices from dollars to cents
           weightInGrams: variant.weightInGrams,
           compareAtPrice: variant.compare_at_price
             ? typeof variant.compare_at_price === "string"
-              ? parseFloat(variant.compare_at_price) * 100
+              ? Number.parseFloat(variant.compare_at_price) * 100
               : variant.compare_at_price
             : 0, // Convert string prices from dollars to cents
           position: variant.position,
@@ -467,12 +476,12 @@ export class ShopClient {
         available: variant.available || false,
         price:
           typeof variant.price === "string"
-            ? parseFloat(variant.price)
+            ? Number.parseFloat(variant.price)
             : variant.price, // Already in correct format (cents as integer)
         weightInGrams: variant.grams,
         compareAtPrice:
           typeof variant.compare_at_price === "string"
-            ? parseFloat(variant.compare_at_price || "0")
+            ? Number.parseFloat(variant.compare_at_price || "0")
             : variant.compare_at_price || 0, // Already in correct format (cents as integer)
         position: variant.position,
         productId: variant.product_id,
@@ -716,7 +725,7 @@ export class ShopClient {
   private async validateLinksInBatches<T>(
     items: T[],
     validator: (item: T) => Promise<boolean>,
-    batchSize: number = 10
+    batchSize = 10
   ): Promise<T[]> {
     const validItems: T[] = [];
 
@@ -961,7 +970,7 @@ export class ShopClient {
 
       return {
         name: name || slug,
-        domain: this.baseUrl,
+        domain: sanitizeDomain(this.baseUrl),
         slug,
         title,
         description,
@@ -1113,9 +1122,15 @@ export class ShopClient {
 
         // Aggregate into breakdown
         breakdown[audience] = breakdown[audience] || {};
-        const arr = (breakdown[audience]![vertical] =
-          breakdown[audience]![vertical] || []);
-        const cat = category && category.trim() ? category.trim() : "general";
+        if (!breakdown[audience]) {
+          breakdown[audience] = {};
+        }
+        const audienceBucket = breakdown[audience]!;
+        if (!audienceBucket[vertical]) {
+          audienceBucket[vertical] = [];
+        }
+        const arr = audienceBucket[vertical]!;
+        const cat = category?.trim() ? category.trim() : "general";
         if (!arr.includes(cat)) arr.push(cat);
       }
 
@@ -1149,6 +1164,7 @@ export type { CollectionOperations } from "./collections";
 export type { ProductOperations } from "./products";
 export type { StoreInfo, StoreOperations } from "./store";
 // Export all types for external use
+// Classification utility
 export type {
   Address,
   CatalogCategory,
@@ -1163,11 +1179,13 @@ export type {
   MetaTag,
   // Core product and collection types
   Product,
+  ProductClassification,
   ProductImage,
   ProductOption,
   ProductPricing,
   ProductVariant,
   ProductVariantImage,
+  SEOContent,
   ShopifyApiProduct,
   ShopifyBaseProduct,
   ShopifyBaseVariant,
@@ -1189,9 +1207,11 @@ export type {
   ShopifyVariantImage,
   // Store and catalog types
   StoreCatalog,
+  StoreTypeBreakdown,
   ValidStoreCatalog,
 } from "./types";
 export { detectShopifyCountry } from "./utils/detect-country";
+export { classifyProduct, generateSEOContent } from "./utils/enrich";
 // Export utility functions
 export {
   calculateDiscount,
@@ -1201,10 +1221,3 @@ export {
   safeParseDate,
   sanitizeDomain,
 } from "./utils/func";
-// Classification utility
-export type {
-  ProductClassification,
-  SEOContent,
-  StoreTypeBreakdown,
-} from "./types";
-export { classifyProduct, generateSEOContent } from "./utils/enrich";

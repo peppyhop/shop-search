@@ -1,17 +1,17 @@
 import { filter, isNonNullish } from "remeda";
-import { StoreInfo } from "./store";
-import {
-  enrichProduct,
-  classifyProduct,
-  generateSEOContent as generateSEOContentLLM,
-} from "./utils/enrich";
-import {
+import type { StoreInfo } from "./store";
+import type {
   Product,
-  ShopifyProduct,
-  ShopifySingleProduct,
   ProductClassification,
   SEOContent,
+  ShopifyProduct,
+  ShopifySingleProduct,
 } from "./types";
+import {
+  classifyProduct,
+  enrichProduct,
+  generateSEOContent as generateSEOContentLLM,
+} from "./utils/enrich";
 
 /**
  * Interface for product operations

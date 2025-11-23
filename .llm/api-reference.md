@@ -59,6 +59,46 @@ console.log(storeInfo?.name); // Store name
 console.log(storeInfo?.description); // Store description
 ```
 
+#### determineStoreType(options?)
+
+```typescript
+async determineStoreType(options?: {
+  apiKey?: string;
+  model?: string;
+  maxShowcaseProducts?: number;
+  maxShowcaseCollections?: number;
+}): Promise<StoreTypeBreakdown>
+```
+
+Infers the store’s audiences and verticals by classifying showcased products using only `product.bodyHtml`. Aggregates per-product classifications into a multi-audience breakdown and prunes results with store-level signals.
+
+**Parameters:**
+- `apiKey` (string, optional): OpenRouter API key for online classification. If omitted or `OPENROUTER_OFFLINE=1`, uses offline heuristics.
+- `model` (string, optional): Model name for online classification.
+- `maxShowcaseProducts` (number, optional): Sample size for showcased products (default: 10, max: 50).
+- `maxShowcaseCollections` (number, optional): Ignored for classification; kept for API symmetry.
+
+**Returns:** Promise resolving to `StoreTypeBreakdown`:
+
+```typescript
+type StoreTypeBreakdown = Partial<
+  Record<
+    'adult_male' | 'adult_female' | 'kid_male' | 'kid_female' | 'generic',
+    Partial<Record<'clothing' | 'beauty' | 'accessories' | 'home-decor' | 'food-and-beverages', string[]>>
+  >
+>;
+```
+
+**Example:**
+```typescript
+const breakdown = await shop.determineStoreType({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  model: 'openai/gpt-4o-mini',
+  maxShowcaseProducts: 12,
+});
+// { generic: { accessories: ['general'] }, adult_female: { clothing: ['dresses'] } }
+```
+
 ## ProductOperations
 
 Access via `shop.products`

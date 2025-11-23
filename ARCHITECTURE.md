@@ -170,6 +170,22 @@ class CheckoutOperations {
 - Discount code application
 - Checkout attribute customization
 
+### Store Type Classification
+
+Determines the store’s audiences and verticals using showcased products.
+
+**Design:**
+- Input source: `StoreInfo.showcase.products` (handles → products via `products.find`).
+- Text basis: strictly `product.bodyHtml` for each showcased product.
+- Sampling: random sample up to `maxShowcaseProducts` (default 10, max 50).
+- Online mode: calls classification via an LLM when `OPENROUTER_API_KEY` is present.
+- Offline mode: regex heuristics on `body_html` when API key absent or `OPENROUTER_OFFLINE=1`.
+- Aggregation: per-product audience/vertical merged into `StoreTypeBreakdown`.
+- Pruning: `pruneBreakdownForSignals` applies store-level signals (title/description) to reduce noise.
+
+**Output:**
+`StoreTypeBreakdown` → `{ [audience]: { [vertical]: string[] } }`.
+
 ## Data Flow
 
 ### 1. Request Initialization
