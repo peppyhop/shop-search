@@ -1,8 +1,11 @@
 import TurndownService from "turndown";
-// @ts-ignore
+// @ts-expect-error
 import { gfm } from "turndown-plugin-gfm";
-import type { ShopifySingleProduct } from "../types";
-import type { ProductClassification, SEOContent } from "../types";
+import type {
+  ProductClassification,
+  SEOContent,
+  ShopifySingleProduct,
+} from "../types";
 
 function ensureOpenRouter(apiKey?: string) {
   const key = apiKey || process.env.OPENROUTER_API_KEY;
@@ -411,11 +414,9 @@ async function callOpenRouter(
         // If content missing, still capture and try fallback
         lastErrorText = JSON.stringify(data);
         await new Promise((r) => setTimeout(r, 200));
-        continue;
       } catch (err: any) {
         lastErrorText = `${url}: ${err?.message || String(err)}`;
         await new Promise((r) => setTimeout(r, 200));
-        continue;
       }
     }
   }

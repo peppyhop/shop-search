@@ -572,3 +572,47 @@ The library respects Shopify's rate limits. For high-volume usage:
 - Use pagination instead of fetching all data at once
 - Cache results when appropriate
 - Monitor for 429 (Too Many Requests) responses
+## Utilities
+
+Utility functions are exported to support common normalization and parsing tasks.
+
+### sanitizeDomain(input, opts?)
+
+```typescript
+import { sanitizeDomain } from 'shop-search';
+sanitizeDomain('https://WWW.Example.com/path?x=1#top'); // 'example.com'
+sanitizeDomain('www.example.com', { stripWWW: false }); // 'www.example.com'
+```
+
+Normalizes domains by:
+- Lowercasing
+- Stripping protocol, path, query, fragment, and ports
+- Stripping `www.` by default (configurable via `stripWWW`)
+
+### safeParseDate(input?)
+
+```typescript
+import { safeParseDate } from 'shop-search';
+safeParseDate('2024-10-31T12:34:56Z'); // Date
+safeParseDate(''); // undefined
+```
+
+Parses date strings safely, returning `undefined` for falsy or invalid inputs. Use `|| null` if null is preferred.
+
+### Variant helpers
+
+```typescript
+import { ProductOperations } from 'shop-search';
+// helper usage is internal in DTOs; keys are normalized
+// map format: 'color#blue##size#xl' → '123456'
+```
+
+Keys in `variantOptionsMap` are normalized (`name#value` parts sorted alphabetically and joined by `##`).
+
+## Release & Publishing
+
+- Automated releases via `semantic-release`.
+- Node.js `22.14.0` for the release job to satisfy `semantic-release` requirements.
+- npm Trusted Publishing with provenance enabled:
+  - Workflow grants `id-token: write` and sets `NPM_CONFIG_PROVENANCE=true`.
+  - npm package settings should add this GitHub repo as a trusted publisher and use environment `npm-publish`.

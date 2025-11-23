@@ -17,7 +17,7 @@ Thank you for your interest in contributing to the `shop-search` library! This d
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- Node.js 22+ and npm (release workflow uses Node `22.14.0`)
 - TypeScript knowledge
 - Familiarity with Shopify's API structure
 - Git for version control
@@ -103,6 +103,41 @@ shop-search/
      return response.json();
    }
    ```
+
+4. **Type-only Imports**
+   Prefer type-only imports to reduce runtime overhead and clarify intent.
+   ```typescript
+   // ✅ Good
+   import type { Product, StoreInfo } from './types';
+   import { createProductOperations } from './products';
+
+   // ❌ Mixed when only types are needed
+   import { Product, StoreInfo } from './types';
+   ```
+
+5. **Regex Hygiene**
+   Avoid complex inline regex with heavy escaping inside string literals. Use `new RegExp(String.raw...)` or break patterns into focused sub-regexes.
+   ```typescript
+   // ✅ Focused extraction without excessive escaping
+   for (const m of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
+     contactLinks.tel = m[1].trim();
+   }
+   for (const m of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
+     contactLinks.email = m[1].trim();
+   }
+   for (const m of html.matchAll(/href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g)) {
+     contactLinks.contactPage = m[1];
+   }
+
+   // ✅ Or use String.raw for longer patterns
+   const pattern = new RegExp(String.raw`<meta[^>]*name=["']description["'][^>]*content=["'](.*?)["']`, 'i');
+   const description = html.match(pattern)?.[1] ?? null;
+   ```
+
+### Linting
+
+- Run `npm run lint:fix` before committing to automatically enforce formatting and import style.
+- Configure consistent type imports via ESLint or Biome (e.g., `@typescript-eslint/consistent-type-imports`).
 
 2. **Interface Design**
    ```typescript
@@ -396,6 +431,12 @@ When adding new operation classes:
 3. **Rate Limiting**: Respect Shopify's API rate limits
 4. **Error Recovery**: Implement retry logic where appropriate
 
+### Utility Usage and Normalization
+
+- Use `sanitizeDomain` to normalize domains when presenting store info or building canonical links.
+- Use `safeParseDate` for parsing incoming date strings; prefer `undefined` for invalid values and cast to `null` in DTOs where required.
+- Use `normalizeKey`, `buildVariantOptionsMap`, and `buildVariantKey` to generate stable variant keys for filters and lookups.
+
 ## Release Process
 
 ### Version Numbering
@@ -414,10 +455,11 @@ We follow [Semantic Versioning](https://semver.org/):
    - [ ] CHANGELOG.md updated
    - [ ] Version bumped in package.json
 
-2. **Release**
-   - [ ] Create release tag
-   - [ ] Publish to npm
-   - [ ] Update GitHub release notes
+2. **Release (Automated)**
+   - [ ] Push to `main` or `beta` with conventional commits
+   - [ ] GitHub Actions runs tests and `semantic-release`
+   - [ ] npm publish via Trusted Publishing (OIDC) with provenance
+   - [ ] GitHub release notes generated automatically
 
 3. **Post-release**
    - [ ] Verify npm package

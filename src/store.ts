@@ -174,22 +174,17 @@ export function createStoreOperations(context: {
           contactPage: null as string | null,
         };
 
-        const contactRegex = new RegExp(
-          "<a[^>]+href=[\"']((?:mailto:|tel:)[^\"']*|[^\"']*(?:\\/contact|\\/pages\\/contact)[^\"']*)[\"']",
-          "g"
-        );
-        for (const match of html.matchAll(contactRegex)) {
-          const link: string = match[1];
-          if (link.startsWith("tel:")) {
-            contactLinks.tel = link.replace("tel:", "").trim();
-          } else if (link.startsWith("mailto:")) {
-            contactLinks.email = link.replace("mailto:", "").trim();
-          } else if (
-            link.includes("/contact") ||
-            link.includes("/pages/contact")
-          ) {
-            contactLinks.contactPage = link;
-          }
+        // Extract contact details using focused regexes to avoid parser pitfalls
+        for (const match of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
+          contactLinks.tel = match[1].trim();
+        }
+        for (const match of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
+          contactLinks.email = match[1].trim();
+        }
+        for (const match of html.matchAll(
+          /href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g
+        )) {
+          contactLinks.contactPage = match[1];
         }
 
         const extractedProductLinks =
