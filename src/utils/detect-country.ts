@@ -86,32 +86,38 @@ export async function detectShopifyCountry(
   );
   if (shopifyFeaturesMatch) {
     try {
-      const data: ShopifyFeaturesData = JSON.parse(shopifyFeaturesMatch[1]);
-      if (data.country)
-        scoreCountry(
-          countryScores,
-          data.country,
-          1,
-          "shopify-features.country"
-        );
-      if (data.locale?.includes("-")) {
-        const localeCountry = data.locale.split("-")[1];
-        scoreCountry(
-          countryScores,
-          localeCountry.toUpperCase(),
-          0.7,
-          "shopify-features.locale"
-        );
-      }
-      if (data.moneyFormat) {
-        for (const symbol in CURRENCY_SYMBOLS) {
-          if (data.moneyFormat.includes(symbol))
+      const json = shopifyFeaturesMatch[1];
+      if (!json) {
+        // no content in capture group; skip
+      } else {
+        const data: ShopifyFeaturesData = JSON.parse(json);
+        if (data.country)
+          scoreCountry(
+            countryScores,
+            data.country,
+            1,
+            "shopify-features.country"
+          );
+        if (data.locale?.includes("-")) {
+          const [, localeCountry] = data.locale.split("-");
+          if (localeCountry) {
             scoreCountry(
               countryScores,
-              CURRENCY_SYMBOLS[symbol],
-              0.6,
-              "moneyFormat symbol"
+              localeCountry.toUpperCase(),
+              0.7,
+              "shopify-features.locale"
             );
+          }
+        }
+        if (data.moneyFormat) {
+          for (const symbol in CURRENCY_SYMBOLS) {
+            if (data.moneyFormat.includes(symbol)) {
+              const iso = CURRENCY_SYMBOLS[symbol];
+              if (iso) {
+                scoreCountry(countryScores, iso, 0.6, "moneyFormat symbol");
+              }
+            }
+          }
         }
       }
     } catch (_error) {
@@ -139,33 +145,39 @@ export async function detectShopifyCountry(
   let jsonLdMatch: RegExpExecArray | null = jsonLdRegex.exec(html);
   while (jsonLdMatch !== null) {
     try {
-      const raw = JSON.parse(jsonLdMatch[1]) as unknown;
+      const json = jsonLdMatch[1];
+      if (!json) {
+        // skip empty capture
+      } else {
+        const raw = JSON.parse(json) as unknown;
 
-      const collectAddressCountries = (
-        node: unknown,
-        results: string[] = []
-      ): string[] => {
-        if (Array.isArray(node)) {
-          for (const item of node) collectAddressCountries(item, results);
-          return results;
-        }
-        if (node && typeof node === "object") {
-          const obj = node as Record<string, unknown>;
-          const address = obj.address;
-          if (address && typeof address === "object") {
-            const country = (address as Record<string, unknown>).addressCountry;
-            if (typeof country === "string") results.push(country);
+        const collectAddressCountries = (
+          node: unknown,
+          results: string[] = []
+        ): string[] => {
+          if (Array.isArray(node)) {
+            for (const item of node) collectAddressCountries(item, results);
+            return results;
           }
-          // Support nested graphs
-          const graph = obj["@graph"];
-          if (graph) collectAddressCountries(graph, results);
-        }
-        return results;
-      };
+          if (node && typeof node === "object") {
+            const obj = node as Record<string, unknown>;
+            const address = obj.address;
+            if (address && typeof address === "object") {
+              const country = (address as Record<string, unknown>)
+                .addressCountry;
+              if (typeof country === "string") results.push(country);
+            }
+            // Support nested graphs
+            const graph = obj["@graph"];
+            if (graph) collectAddressCountries(graph, results);
+          }
+          return results;
+        };
 
-      const countries = collectAddressCountries(raw);
-      for (const country of countries) {
-        scoreCountry(countryScores, country, 1, "JSON-LD addressCountry");
+        const countries = collectAddressCountries(raw);
+        for (const country of countries) {
+          scoreCountry(countryScores, country, 1, "JSON-LD addressCountry");
+        }
       }
     } catch (_error) {
       // Silently handle JSON parsing errors
@@ -177,7 +189,8 @@ export async function detectShopifyCountry(
   // 4️⃣ Footer country mentions - now using ISO codes
   const footerMatch = html.match(/<footer[^>]*>(.*?)<\/footer>/i);
   if (footerMatch) {
-    const footerText = footerMatch[1].toLowerCase();
+    const footerTextGroup = footerMatch[1];
+    const footerText = footerTextGroup ? footerTextGroup.toLowerCase() : "";
     // Create a mapping of country names to ISO codes for footer detection
     const countryNameToISO: Record<string, string> = {
       india: "IN",

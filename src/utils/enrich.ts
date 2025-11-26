@@ -911,17 +911,17 @@ Sample Collections:\n${collectionLines.join("\n") || "- N/A"}`;
       adult_female: /\bwomen\b|\bfemale\b|\bwoman\b|\bwomens\b/,
     };
     const audiences: ProductClassification["audience"][] = [];
-    if (audienceKeywords.kid.test(text)) {
-      if (audienceKeywords.kid_male.test(text)) audiences.push("kid_male");
-      if (audienceKeywords.kid_female.test(text)) audiences.push("kid_female");
+    if (audienceKeywords.kid?.test(text)) {
+      if (audienceKeywords.kid_male?.test(text)) audiences.push("kid_male");
+      if (audienceKeywords.kid_female?.test(text)) audiences.push("kid_female");
       if (
-        !audienceKeywords.kid_male.test(text) &&
-        !audienceKeywords.kid_female.test(text)
+        !audienceKeywords.kid_male?.test(text) &&
+        !audienceKeywords.kid_female?.test(text)
       )
         audiences.push("generic");
     } else {
-      if (audienceKeywords.adult_male.test(text)) audiences.push("adult_male");
-      if (audienceKeywords.adult_female.test(text))
+      if (audienceKeywords.adult_male?.test(text)) audiences.push("adult_male");
+      if (audienceKeywords.adult_female?.test(text))
         audiences.push("adult_female");
       if (audiences.length === 0) audiences.push("generic");
     }
@@ -1114,19 +1114,20 @@ export function pruneBreakdownForSignals(
   };
 
   const signaledAudiences = new Set<ProductClassification["audience"]>();
-  if (audienceKeywords.kid.test(text)) {
-    if (audienceKeywords.kid_male.test(text)) signaledAudiences.add("kid_male");
-    if (audienceKeywords.kid_female.test(text))
+  if (audienceKeywords.kid?.test(text)) {
+    if (audienceKeywords.kid_male?.test(text))
+      signaledAudiences.add("kid_male");
+    if (audienceKeywords.kid_female?.test(text))
       signaledAudiences.add("kid_female");
     if (
-      !audienceKeywords.kid_male.test(text) &&
-      !audienceKeywords.kid_female.test(text)
+      !audienceKeywords.kid_male?.test(text) &&
+      !audienceKeywords.kid_female?.test(text)
     )
       signaledAudiences.add("generic");
   } else {
-    if (audienceKeywords.adult_male.test(text))
+    if (audienceKeywords.adult_male?.test(text))
       signaledAudiences.add("adult_male");
-    if (audienceKeywords.adult_female.test(text))
+    if (audienceKeywords.adult_female?.test(text))
       signaledAudiences.add("adult_female");
     if (signaledAudiences.size === 0) signaledAudiences.add("generic");
   }

@@ -45,17 +45,17 @@ import {
 export class ShopClient {
   private storeDomain: string;
   private baseUrl: string;
+  private storeSlug: string;
   private validationCache: Map<string, boolean> = new Map(); // Simple cache for validation results
   private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes cache expiry
   private cacheTimestamps: Map<string, number> = new Map();
   private normalizeImageUrlCache: Map<string, string> = new Map();
-  private storeSlug: string;
-  private storeOperations: StoreOperations;
 
   // Public operations interfaces
   public products: ProductOperations;
   public collections: CollectionOperations;
   public checkout: CheckoutOperations;
+  public storeOperations: StoreOperations;
 
   /**
    * Creates a new ShopClient instance for interacting with a Shopify store.
@@ -305,10 +305,9 @@ export class ShopClient {
         productType: product.product_type || null,
         tags: Array.isArray(product.tags) ? product.tags : [],
         vendor: product.vendor,
-        featuredImage:
-          product.images.length > 0
-            ? this.normalizeImageUrl(product.images[0].src)
-            : null,
+        featuredImage: product.images?.[0]?.src
+          ? this.normalizeImageUrl(product.images[0].src)
+          : null,
         isProxyFeaturedImage: false,
         createdAt: safeParseDate(product.created_at),
         updatedAt: safeParseDate(product.updated_at),
@@ -331,7 +330,7 @@ export class ShopClient {
         metaTags: null,
         displayScore: undefined,
         deletedAt: null,
-        storeSlug: this.storeDomain,
+        storeSlug: this.storeSlug,
         storeDomain: this.storeDomain,
         url: `${this.storeDomain}/products/${product.handle}`,
       };
@@ -449,7 +448,7 @@ export class ShopClient {
       metaTags: null,
       displayScore: undefined,
       deletedAt: null,
-      storeSlug: this.storeDomain,
+      storeSlug: this.storeSlug,
       storeDomain: this.storeDomain,
       url: product.url || `${this.storeDomain}/products/${product.handle}`,
     };
@@ -630,7 +629,7 @@ export class ShopClient {
     }
 
     try {
-      const url = `${this.baseUrl}collections/${handle}.js`;
+      const url = `${this.baseUrl}collections/${handle}.json`;
       const response = await fetch(url, { method: "HEAD" });
       const exists = response.ok;
 
@@ -772,9 +771,8 @@ export class ShopClient {
         const logoMatch = html.match(
           /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/
         );
-        logoUrl = logoMatch
-          ? logoMatch[1].replace("http://", "https://")
-          : null;
+        const matchedUrl = logoMatch?.[1];
+        logoUrl = matchedUrl ? matchedUrl.replace("http://", "https://") : null;
       } else {
         logoUrl = logoUrl.replace("http://", "https://");
       }
@@ -783,7 +781,9 @@ export class ShopClient {
       const socialRegex =
         /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
       for (const match of html.matchAll(socialRegex)) {
-        let href: string = match[1];
+        const str = match[1];
+        if (!str) continue;
+        let href: string = str;
         try {
           // Normalize protocol-relative URLs and relative paths
           if (href.startsWith("//")) {
@@ -811,22 +811,22 @@ export class ShopClient {
 
       // Extract contact details using focused regexes to avoid parser pitfalls
       for (const match of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
-        contactLinks.tel = match[1].trim();
+        contactLinks.tel = match?.[1]?.trim() || null;
       }
       for (const match of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
-        contactLinks.email = match[1].trim();
+        contactLinks.email = match?.[1]?.trim() || null;
       }
       for (const match of html.matchAll(
         /href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g
       )) {
-        contactLinks.contactPage = match[1];
+        contactLinks.contactPage = match?.[1] || null;
       }
 
       const extractedProductLinks =
         html
           .match(/href=["']([^"']*\/products\/[^"']+)["']/g)
           ?.map((match) =>
-            match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
+            match?.split("href=")[1]?.replace(/['"]/g, "")?.split("/").at(-1)
           )
           ?.filter(Boolean) || [];
 
@@ -834,7 +834,7 @@ export class ShopClient {
         html
           .match(/href=["']([^"']*\/collections\/[^"']+)["']/g)
           ?.map((match) =>
-            match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
+            match?.split("href=")[1]?.replace(/['"]/g, "")?.split("/").at(-1)
           )
           ?.filter(Boolean) || [];
 
@@ -860,8 +860,12 @@ export class ShopClient {
         .match(
           /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g
         )
-        ?.map((match) => match.split(">")[1].replace(/<\/script/g, ""));
-      const jsonLdData = jsonLd?.map((json) => JSON.parse(json));
+        ?.map(
+          (match) => match?.split(">")[1]?.replace(/<\/script/g, "") || null
+        );
+      const jsonLdData = jsonLd?.map((json) =>
+        json ? JSON.parse(json) : null
+      );
 
       const headerLinks =
         html
@@ -908,9 +912,9 @@ export class ShopClient {
         name: name || slug,
         domain: sanitizeDomain(this.baseUrl),
         slug,
-        title,
-        description,
-        logoUrl,
+        title: title || null,
+        description: description || null,
+        logoUrl: logoUrl,
         socialLinks,
         contactLinks,
         headerLinks,
@@ -922,7 +926,7 @@ export class ShopClient {
         techProvider: {
           name: "shopify",
           walletId: shopifyWalletId,
-          subDomain: myShopifySubdomain,
+          subDomain: myShopifySubdomain ?? null,
         },
         country: countryDetection.country,
       };
@@ -956,7 +960,10 @@ export class ShopClient {
         const a = arr.slice();
         for (let i = a.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [a[i], a[j]] = [a[j], a[i]];
+          const ai = a[i]!;
+          const aj = a[j]!;
+          a[i] = aj;
+          a[j] = ai;
         }
         return a.slice(0, n);
       };
@@ -971,14 +978,26 @@ export class ShopClient {
         `${info.title || info.name} ${info.description ?? ""}`.toLowerCase();
 
       // Regex heuristics for offline/missing API key classification
-      const audienceKeywords: Record<string, RegExp> = {
+      type AudienceKey =
+        | "kid"
+        | "kid_male"
+        | "kid_female"
+        | "adult_male"
+        | "adult_female";
+      const audienceKeywords: Record<AudienceKey, RegExp> = {
         kid: /(\bkid\b|\bchild\b|\bchildren\b|\btoddler\b|\bboy\b|\bgirl\b)/,
         kid_male: /\bboys\b|\bboy\b/,
         kid_female: /\bgirls\b|\bgirl\b/,
         adult_male: /\bmen\b|\bmale\b|\bman\b|\bmens\b/,
         adult_female: /\bwomen\b|\bfemale\b|\bwoman\b|\bwomens\b/,
       };
-      const verticalKeywords: Record<string, RegExp> = {
+      type Vertical =
+        | "clothing"
+        | "beauty"
+        | "accessories"
+        | "home-decor"
+        | "food-and-beverages";
+      const verticalKeywords: Record<Vertical, RegExp> = {
         clothing:
           /(dress|shirt|pant|jean|hoodie|tee|t[- ]?shirt|sneaker|apparel|clothing)/,
         beauty: /(skincare|moisturizer|serum|beauty|cosmetic|makeup)/,
@@ -1034,39 +1053,38 @@ export class ShopClient {
         }
 
         if (isOffline) {
-          // Audience detection
-          if (audienceKeywords.kid.test(productText)) {
-            if (audienceKeywords.kid_male.test(productText))
-              audience = "kid_male";
-            else if (audienceKeywords.kid_female.test(productText))
-              audience = "kid_female";
-            else audience = "generic";
+          // Audience detection (kids vs generic)
+          if (audienceKeywords.kid_male.test(productText)) {
+            audience = "kid_male";
+          } else if (audienceKeywords.kid_female.test(productText)) {
+            audience = "kid_female";
           } else {
-            if (audienceKeywords.adult_male.test(productText))
-              audience = "adult_male";
-            else if (audienceKeywords.adult_female.test(productText))
-              audience = "adult_female";
-            else audience = "generic";
+            audience = "generic";
           }
-          // Vertical detection
-          const v = Object.entries(verticalKeywords).find(([, rx]) =>
+          // Vertical detection for offline mode
+          const vEntry = Object.entries(verticalKeywords).find(([, rx]) =>
             rx.test(productText)
           );
-          vertical = v ? (v[0] as typeof vertical) : "accessories";
+          vertical = vEntry ? (vEntry[0] as typeof vertical) : "accessories";
           category = "general";
+        } else {
+          // Audience detection (adult vs generic)
+          if (audienceKeywords.adult_male.test(productText)) {
+            audience = "adult_male";
+          } else if (audienceKeywords.adult_female.test(productText)) {
+            audience = "adult_female";
+          } else {
+            audience = "generic";
+          }
         }
 
-        // Aggregate into breakdown
         breakdown[audience] = breakdown[audience] || {};
-        if (!breakdown[audience]) {
-          breakdown[audience] = {};
-        }
         const audienceBucket = breakdown[audience]!;
         if (!audienceBucket[vertical]) {
           audienceBucket[vertical] = [];
         }
         const arr = audienceBucket[vertical]!;
-        const cat = category?.trim() ? category.trim() : "general";
+        const cat = (category ?? "").trim() || "general";
         if (!arr.includes(cat)) arr.push(cat);
       }
 
@@ -1088,7 +1106,7 @@ export class ShopClient {
       } catch {
         return breakdown;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       throw this.handleFetchError(error, "determineStoreType", this.baseUrl);
     }
   }

@@ -140,9 +140,8 @@ export function createStoreOperations(context: {
           const logoMatch = html.match(
             /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/
           );
-          logoUrl = logoMatch
-            ? logoMatch[1].replace("http://", "https://")
-            : null;
+          const group = logoMatch?.[1];
+          logoUrl = group ? group.replace("http://", "https://") : null;
         } else {
           logoUrl = logoUrl.replace("http://", "https://");
         }
@@ -151,7 +150,9 @@ export function createStoreOperations(context: {
         const socialRegex =
           /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
         for (const match of html.matchAll(socialRegex)) {
-          let href: string = match[1];
+          const hrefGroup = match[1];
+          if (!hrefGroup) continue;
+          let href: string = hrefGroup;
           try {
             if (href.startsWith("//")) {
               href = `https:${href}`;
@@ -176,32 +177,41 @@ export function createStoreOperations(context: {
 
         // Extract contact details using focused regexes to avoid parser pitfalls
         for (const match of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
-          contactLinks.tel = match[1].trim();
+          const group = match[1];
+          if (group) contactLinks.tel = group.trim();
         }
         for (const match of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
-          contactLinks.email = match[1].trim();
+          const group = match[1];
+          if (group) contactLinks.email = group.trim();
         }
         for (const match of html.matchAll(
           /href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g
         )) {
-          contactLinks.contactPage = match[1];
+          const group = match[1];
+          if (group) contactLinks.contactPage = group;
         }
 
         const extractedProductLinks =
           html
             .match(/href=["']([^"']*\/products\/[^"']+)["']/g)
-            ?.map((match) =>
-              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
-            )
-            ?.filter(Boolean) || [];
+            ?.map((match) => {
+              const afterHref = match.split("href=")[1];
+              if (!afterHref) return null;
+              const last = afterHref.replace(/[\'"]/g, "").split("/").at(-1);
+              return last ?? null;
+            })
+            ?.filter((x): x is string => Boolean(x)) || [];
 
         const extractedCollectionLinks =
           html
             .match(/href=["']([^"']*\/collections\/[^"']+)["']/g)
-            ?.map((match) =>
-              match.split("href=")[1].replace(/['"]/g, "").split("/").at(-1)
-            )
-            ?.filter(Boolean) || [];
+            ?.map((match) => {
+              const afterHref = match.split("href=")[1];
+              if (!afterHref) return null;
+              const last = afterHref.replace(/[\'"]/g, "").split("/").at(-1);
+              return last ?? null;
+            })
+            ?.filter((x): x is string => Boolean(x)) || [];
 
         // Validate links in batches for better performance
         const [homePageProductLinks, homePageCollectionLinks] =
@@ -224,7 +234,10 @@ export function createStoreOperations(context: {
           .match(
             /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g
           )
-          ?.map((match) => match.split(">")[1].replace(/<\/script/g, ""));
+          ?.map((match) => {
+            const afterGt = match.split(">")[1];
+            return afterGt ? afterGt.replace(/<\/script/g, "") : "";
+          });
         const jsonLdData: JsonLdEntry[] | undefined = jsonLd?.map(
           (json) => JSON.parse(json) as JsonLdEntry
         );
@@ -274,8 +287,8 @@ export function createStoreOperations(context: {
           name: name || slug,
           domain: context.baseUrl,
           slug,
-          title,
-          description,
+          title: title ?? null,
+          description: description ?? null,
           logoUrl,
           socialLinks,
           contactLinks,
@@ -288,7 +301,7 @@ export function createStoreOperations(context: {
           techProvider: {
             name: "shopify",
             walletId: shopifyWalletId,
-            subDomain: myShopifySubdomain,
+            subDomain: myShopifySubdomain ?? null,
           },
           country: countryDetection?.country || "",
         };
