@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/peppyhop/shop-search/compare/v1.0.2...v1.0.3) (2025-11-26)
+
+### Bug Fixes
+
+* minor bugs and linting issues ([#3](https://github.com/peppyhop/shop-search/issues/3)) ([65150f6](https://github.com/peppyhop/shop-search/commit/65150f63d2af89d2a21ddaf9803a483f8df53634))
+* update collection endpoint from .js to .json extension ([46f0a26](https://github.com/peppyhop/shop-search/commit/46f0a26d8467bf9f0bea83e221c4cc5229ae5432))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
