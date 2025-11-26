@@ -1,3 +1,9 @@
+## [3.3.0](https://github.com/peppyhop/shop-search/compare/v3.2.1...v3.3.0) (2025-11-26)
+
+### Features
+
+* **collections:** add slugs method to fetch product slugs from collection ([#5](https://github.com/peppyhop/shop-search/issues/5)) ([7532b17](https://github.com/peppyhop/shop-search/commit/7532b17269d95271be26ad0c54ce4ab8ef05b528))
+
 ## [1.0.3](https://github.com/peppyhop/shop-search/compare/v1.0.2...v1.0.3) (2025-11-26)
 
 ### Bug Fixes
