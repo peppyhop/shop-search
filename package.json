@@ -14,6 +14,10 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "provenance": true,
+    "ignore-scripts": true
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -24,7 +28,7 @@
     "lint": "biome lint --diagnostic-level=error --no-errors-on-unmatched . && tsc --noEmit -p tsconfig.json",
     "lint:fix": "biome check --write --unsafe .",
     "lint:staged": "lint-staged",
-    "prepare": "husky"
+    "prepare": "command -v husky >/dev/null 2>&1 && husky || true"
   },
   "keywords": [
     "shopify",
