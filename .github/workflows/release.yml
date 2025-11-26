@@ -74,5 +74,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-          npm_config_ignore_scripts: true
+          NPM_CONFIG_IGNORE_SCRIPTS: true
         run: bun run semantic-release
