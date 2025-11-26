@@ -11,7 +11,7 @@ export function generateStoreSlug(domain: string): string {
   const domainName =
     parsedDomain.domainWithoutSuffix ?? input.hostname.split(".")[0];
 
-  return domainName
+  return (domainName || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "-")
     .replace(/-+/g, "-")

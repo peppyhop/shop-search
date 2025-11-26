@@ -226,8 +226,10 @@ export function createProductOperations(
         let qs: string | null = null;
         if (productHandle.includes("?")) {
           const parts = productHandle.split("?");
-          productHandle = parts[0];
-          qs = parts[1];
+          const handlePart = parts[0] ?? productHandle;
+          const qsPart = parts[1] ?? null;
+          productHandle = handlePart;
+          qs = qsPart;
         }
 
         // Sanitize handle - remove potentially dangerous characters
@@ -467,10 +469,14 @@ export function createProductOperations(
                 }
                 // Add all values from this option (converted to lowercase)
                 option.values.forEach((value) => {
-                  if (value?.trim()) {
-                    filterMap[lowercaseOptionName].add(
-                      value.trim().toLowerCase()
-                    );
+                  const trimmed = value?.trim();
+                  if (trimmed) {
+                    let set = filterMap[lowercaseOptionName];
+                    if (!set) {
+                      set = new Set<string>();
+                      filterMap[lowercaseOptionName] = set;
+                    }
+                    set.add(trimmed.toLowerCase());
                   }
                 });
               });
@@ -482,20 +488,24 @@ export function createProductOperations(
                 const optionName = (
                   product.options?.[0]?.name || "Option 1"
                 ).toLowerCase();
-                if (!filterMap[optionName]) {
-                  filterMap[optionName] = new Set();
+                let set1 = filterMap[optionName];
+                if (!set1) {
+                  set1 = new Set<string>();
+                  filterMap[optionName] = set1;
                 }
-                filterMap[optionName].add(variant.option1.trim().toLowerCase());
+                set1.add(variant.option1.trim().toLowerCase());
               }
 
               if (variant.option2) {
                 const optionName = (
                   product.options?.[1]?.name || "Option 2"
                 ).toLowerCase();
-                if (!filterMap[optionName]) {
-                  filterMap[optionName] = new Set();
+                let set2 = filterMap[optionName];
+                if (!set2) {
+                  set2 = new Set<string>();
+                  filterMap[optionName] = set2;
                 }
-                filterMap[optionName].add(variant.option2.trim().toLowerCase());
+                set2.add(variant.option2.trim().toLowerCase());
               }
 
               if (variant.option3) {

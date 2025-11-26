@@ -140,6 +140,21 @@ Publishing to npm requires the GitHub Actions workflow with OIDC. Manual local p
 3. **Provenance required**: Ensure `NPM_CONFIG_PROVENANCE=true` and npm package requires provenance
 4. **Tests fail**: Ensure all tests pass before merging to main
 
+### Dependency Vulnerabilities and Overrides
+
+- If CI or scanners flag vulnerable transitive dependencies (e.g., `glob@10.3.7–11.0.3` CLI vulnerability), use npm `overrides` to pin a safe version.
+- Example:
+  ```json
+  {
+    "overrides": {
+      "glob": "11.1.0"
+    }
+  }
+  ```
+- After updating `package.json`, run `npm install` to update `package-lock.json`.
+- Verify the build and tests still pass.
+- Avoid manual changes to `CHANGELOG.md`; semantic-release manages it automatically.
+
 ### Debug Commands
 
 ```bash

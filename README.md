@@ -640,6 +640,21 @@ try {
 }
 ```
 
+## 🔐 Security and Dependency Overrides
+
+- This project pins vulnerable transitive dependencies using npm `overrides` to keep CI/security scans green.
+- We currently force `glob` to `11.1.0` to avoid the CLI command injection vulnerability affecting `glob@10.3.7–11.0.3`.
+- The library does not use the `glob` CLI; pinning removes audit warnings without impacting functionality.
+- If scanners flag new CVEs, update `package.json` `overrides` and reinstall dependencies.
+
+## ✅ Parsing Reliability Notes
+
+- Contact link parsing is hardened to correctly detect:
+  - `tel:` phone links
+  - `mailto:` email links
+  - `contactPage` URLs (e.g., `/pages/contact`)
+- Tests cover protocol-relative social links normalization and contact page detection to prevent regressions.
+
 ## 📄 License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
@@ -651,4 +666,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📞 Support
 
 For questions and support, please open an issue on the GitHub repository.
-
