@@ -37,6 +37,10 @@ export interface CollectionOperations {
      * Fetches all products from a specific collection.
      */
     all(collectionHandle: string): Promise<Product[] | null>;
+    /**
+     * Fetches all product slugs from a specific collection.
+     */
+    slugs(collectionHandle: string): Promise<string[] | null>;
   };
 }
 
@@ -380,6 +384,78 @@ export function createCollectionOperations(
         } catch (error) {
           console.error(
             `Error fetching all products for collection ${sanitizedHandle}:`,
+            baseUrl,
+            error
+          );
+          return null;
+        }
+      },
+
+      /**
+       * Fetches all product slugs from a specific collection.
+       *
+       * @param collectionHandle - The collection handle to fetch product slugs from
+       *
+       * @returns {Promise<string[] | null>} Array of product slugs from the collection or null if error occurs
+       *
+       * @throws {Error} When the collection handle is invalid or there's a network error
+       *
+       * @example
+       * ```typescript
+       * const shop = new ShopClient('https://exampleshop.com');
+       * const productSlugs = await shop.collections.products.slugs('summer-collection');
+       * console.log(productSlugs);
+       * ```
+       */
+      slugs: async (collectionHandle: string): Promise<string[] | null> => {
+        // Validate collection handle
+        if (!collectionHandle || typeof collectionHandle !== "string") {
+          throw new Error("Collection handle is required and must be a string");
+        }
+
+        // Sanitize handle - remove potentially dangerous characters
+        const sanitizedHandle = collectionHandle
+          .trim()
+          .replace(/[^a-zA-Z0-9\-_]/g, "");
+        if (!sanitizedHandle) {
+          throw new Error("Invalid collection handle format");
+        }
+
+        // Check handle length (reasonable limits)
+        if (sanitizedHandle.length > 255) {
+          throw new Error("Collection handle is too long");
+        }
+
+        try {
+          const limit = 250;
+          const slugs: string[] = [];
+
+          let currentPage = 1;
+
+          while (true) {
+            const products = await fetchPaginatedProductsFromCollection(
+              sanitizedHandle,
+              {
+                page: currentPage,
+                limit,
+              }
+            );
+
+            if (!products || products.length === 0 || products.length < limit) {
+              if (products && products.length > 0) {
+                slugs.push(...products.map((p) => p.slug));
+              }
+              break;
+            }
+
+            slugs.push(...products.map((p) => p.slug));
+            currentPage++;
+          }
+
+          return slugs;
+        } catch (error) {
+          console.error(
+            `Error fetching product slugs for collection ${sanitizedHandle}:`,
             baseUrl,
             error
           );
