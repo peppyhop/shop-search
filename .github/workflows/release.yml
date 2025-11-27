@@ -8,17 +8,6 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Branch (or tag) to release from'
-        required: false
-        default: 'main'
-      dryRun:
-        description: 'Run semantic-release in dry run mode'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   test:
@@ -85,58 +74,6 @@ jobs:
         run: npm i -g npm@latest && npm -v
 
       - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-        run: npx semantic-release
-
-  release_manual:
-    name: Release (Manual)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    environment: npm-publish
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ inputs.ref }}
-
-      - name: Setup Node.js (for npm provenance)
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install dependencies (Bun)
-        run: bun install
-
-      - name: Build (Bun)
-        run: bun run build
-
-      - name: Upgrade npm (avoid known provenance bugs)
-        run: npm i -g npm@latest && npm -v
-
-      - name: Release (dry run)
-        if: inputs.dryRun == true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-        run: npx semantic-release --dry-run
-
-      - name: Release
-        if: inputs.dryRun != true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
