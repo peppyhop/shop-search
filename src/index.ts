@@ -25,6 +25,7 @@ import {
   safeParseDate,
   sanitizeDomain,
 } from "./utils/func";
+import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
  * A comprehensive Shopify store client for fetching products, collections, and store information.
@@ -525,7 +526,7 @@ export class ShopClient {
   ): Promise<Product[] | null> {
     try {
       const url = `${this.baseUrl}products.json?page=${page}&limit=${limit}`;
-      const response = await fetch(url);
+      const response = await rateLimitedFetch(url);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -548,7 +549,7 @@ export class ShopClient {
   private async fetchCollections(page: number, limit: number) {
     try {
       const url = `${this.baseUrl}collections.json?page=${page}&limit=${limit}`;
-      const response = await fetch(url);
+      const response = await rateLimitedFetch(url);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -575,7 +576,7 @@ export class ShopClient {
     try {
       const { page = 1, limit = 250 } = options;
       const url = `${this.baseUrl}collections/${collectionHandle}/products.json?page=${page}&limit=${limit}`;
-      const response = await fetch(url);
+      const response = await rateLimitedFetch(url);
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -607,7 +608,7 @@ export class ShopClient {
 
     try {
       const url = `${this.baseUrl}products/${handle}.js`;
-      const response = await fetch(url, { method: "HEAD" });
+      const response = await rateLimitedFetch(url, { method: "HEAD" });
       const exists = response.ok;
 
       this.setCacheValue(cacheKey, exists);
@@ -630,7 +631,7 @@ export class ShopClient {
 
     try {
       const url = `${this.baseUrl}collections/${handle}.json`;
-      const response = await fetch(url, { method: "HEAD" });
+      const response = await rateLimitedFetch(url, { method: "HEAD" });
       const exists = response.ok;
 
       this.setCacheValue(cacheKey, exists);
@@ -724,7 +725,7 @@ export class ShopClient {
    */
   async getInfo(): Promise<StoreInfo> {
     try {
-      const response = await fetch(this.baseUrl);
+      const response = await rateLimitedFetch(this.baseUrl);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -1175,3 +1176,4 @@ export {
   safeParseDate,
   sanitizeDomain,
 } from "./utils/func";
+export { configureRateLimit } from "./utils/rate-limit";

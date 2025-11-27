@@ -2,6 +2,7 @@ import { unique } from "remeda";
 import type { CountryDetectionResult, JsonLdEntry } from "./types";
 import { detectShopifyCountry } from "./utils/detect-country";
 import { extractDomainWithoutSuffix, generateStoreSlug } from "./utils/func";
+import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
  * Store operations interface for managing store-related functionality.
@@ -92,7 +93,7 @@ export function createStoreOperations(context: {
      */
     info: async (): Promise<StoreInfo> => {
       try {
-        const response = await fetch(context.baseUrl);
+        const response = await rateLimitedFetch(context.baseUrl);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

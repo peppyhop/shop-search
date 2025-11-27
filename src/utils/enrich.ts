@@ -6,6 +6,7 @@ import type {
   SEOContent,
   ShopifySingleProduct,
 } from "../types";
+import { rateLimitedFetch } from "./rate-limit";
 
 function ensureOpenRouter(apiKey?: string) {
   const key = apiKey || process.env.OPENROUTER_API_KEY;
@@ -48,7 +49,7 @@ export async function fetchAjaxProduct(
 ): Promise<ShopifySingleProduct> {
   const base = normalizeDomainToBase(domain);
   const url = `${base}/products/${handle}.js`;
-  const res = await fetch(url);
+  const res = await rateLimitedFetch(url);
   if (!res.ok) throw new Error(`Failed to fetch AJAX product: ${url}`);
   const data: ShopifySingleProduct = await res.json();
   return data;
@@ -63,7 +64,7 @@ export async function fetchProductPage(
 ): Promise<string> {
   const base = normalizeDomainToBase(domain);
   const url = `${base}/products/${handle}`;
-  const res = await fetch(url);
+  const res = await rateLimitedFetch(url);
   if (!res.ok) throw new Error(`Failed to fetch product page: ${url}`);
   return res.text();
 }
@@ -393,7 +394,7 @@ async function callOpenRouter(
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
-        const response = await fetch(url, {
+        const response = await rateLimitedFetch(url, {
           method: "POST",
           headers,
           body: JSON.stringify(buildPayload(m)),

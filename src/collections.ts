@@ -1,6 +1,7 @@
 import { filter, isNonNullish } from "remeda";
 import type { StoreInfo } from "./store";
 import type { Collection, Product, ShopifyCollection } from "./types";
+import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
  * Interface for collection operations
@@ -162,7 +163,7 @@ export function createCollectionOperations(
 
       try {
         const url = `${baseUrl}collections/${encodeURIComponent(sanitizedHandle)}.json`;
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
 
         if (!response.ok) {
           if (response.status === 404) {
