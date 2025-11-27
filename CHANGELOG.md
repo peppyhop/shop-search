@@ -1,3 +1,9 @@
+## [3.5.0](https://github.com/peppyhop/shop-search/compare/v3.4.0...v3.5.0) (2025-11-27)
+
+### Features
+
+* **build:** enable subpath exports and lazy rate limiter initialization ([#8](https://github.com/peppyhop/shop-search/issues/8)) ([d6dd0c6](https://github.com/peppyhop/shop-search/commit/d6dd0c6e6bf249c0721d35120e103bb302d0099b))
+
 ## [3.4.0](https://github.com/peppyhop/shop-search/compare/v3.3.0...v3.4.0) (2025-11-27)
 
 ### Features
