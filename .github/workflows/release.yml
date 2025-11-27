@@ -70,9 +70,11 @@ jobs:
       - name: Build (Bun)
         run: bun run build
 
+      - name: Upgrade npm (avoid known provenance bugs)
+        run: npm i -g npm@latest && npm -v
+
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-          NPM_CONFIG_IGNORE_SCRIPTS: true
         run: npx semantic-release
