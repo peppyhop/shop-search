@@ -1,3 +1,9 @@
+## [3.4.0](https://github.com/peppyhop/shop-search/compare/v3.3.0...v3.4.0) (2025-11-27)
+
+### Features
+
+* **rate-limit:** add global rate limiting for HTTP requests ([#6](https://github.com/peppyhop/shop-search/issues/6)) ([8070e4f](https://github.com/peppyhop/shop-search/commit/8070e4f2e40cb464b39d15e5d2ccbc22c5131722))
+
 ## [3.3.0](https://github.com/peppyhop/shop-search/compare/v3.2.1...v3.3.0) (2025-11-26)
 
 ### Features
