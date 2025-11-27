@@ -20,7 +20,6 @@ class RateLimiter {
   constructor(options: RateLimitOptions) {
     this.options = options;
     this.tokens = options.maxRequestsPerInterval;
-    this.startRefill();
   }
 
   private startRefill() {
@@ -38,6 +37,19 @@ class RateLimiter {
     }
   }
 
+  private stopRefill() {
+    if (this.refillTimer) {
+      clearInterval(this.refillTimer);
+      this.refillTimer = null;
+    }
+  }
+
+  private ensureRefillStarted() {
+    if (!this.refillTimer) {
+      this.startRefill();
+    }
+  }
+
   configure(next: Partial<RateLimitOptions>) {
     this.options = { ...this.options, ...next };
     // Clamp to sensible minimums
@@ -51,6 +63,8 @@ class RateLimiter {
 
   schedule<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
+      // Start the timer lazily on first schedule/use
+      this.ensureRefillStarted();
       this.queue.push({ fn, resolve, reject });
       this.tryRun();
     });

@@ -49,7 +49,66 @@ const products = await shop.products.all();
 const product = await shop.products.find("product-handle");
 ```
 
-## 🛡️ Rate Limiting
+## Deep Imports & Tree-Shaking
+
+For optimal bundle size, import only what you need using subpath exports. The library ships ESM/CJS builds and declares `sideEffects: false` for better dead code elimination.
+
+Examples:
+
+```typescript
+// ESM deep imports
+import { configureRateLimit } from 'shop-search/rate-limit';
+import { ProductOperations } from 'shop-search/products';
+
+// CommonJS deep imports
+const { configureRateLimit } = require('shop-search/rate-limit');
+const { ProductOperations } = require('shop-search/products');
+
+// Recommended: import specific functions you use
+import { ShopClient } from 'shop-search';
+import { fetchProducts } from 'shop-search/products';
+```
+
+Notes:
+- ESM consumers (Vite/Rollup/esbuild) get tree-shaking out of the box.
+- Webpack benefits from `sideEffects: false`; avoid importing wide barrels when possible.
+- Rate limiter timer starts lazily on first use (no import-time side effects).
+
+### Migration: Barrel → Subpath Imports
+
+You can keep using the root entry (`shop-search`), but for smaller bundles switch to deep imports. The API remains the same—only the import paths change.
+
+Examples:
+
+```typescript
+// Before (barrel import)
+import { ShopClient, configureRateLimit } from 'shop-search';
+
+// After (deep imports for better tree-shaking)
+import { ShopClient } from 'shop-search';
+import { configureRateLimit } from 'shop-search/rate-limit';
+
+// Feature-specific imports
+import { fetchProducts } from 'shop-search/products';
+import { createCheckoutOperations } from 'shop-search/checkout';
+```
+
+CommonJS:
+
+```javascript
+// Before
+const { ShopClient, configureRateLimit } = require('shop-search');
+
+// After
+const { ShopClient } = require('shop-search');
+const { configureRateLimit } = require('shop-search/rate-limit');
+```
+
+Notes:
+- No bundler changes required; deep imports are exposed via `exports`.
+- The root entry continues to work; prefer deep imports for production apps.
+
+## ��️ Rate Limiting
 
 `shop-search` ships with an opt-in, global rate limiter that transparently throttles all internal HTTP requests (products, collections, store info, enrichment). This helps avoid `429 Too Many Requests` responses and keeps crawling stable.
 
@@ -115,6 +174,12 @@ Resolution order:
 - If `rateLimitClass` is present, that bucket is used.
 - Else, a matching `perHost` bucket is used (exact match first, then wildcard suffix).
 - Else, the global default bucket is used.
+
+Tip: You can deep import the limiter configuration surface:
+
+```typescript
+import { configureRateLimit } from 'shop-search/rate-limit';
+```
 
 ## 📚 API Reference
 

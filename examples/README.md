@@ -82,6 +82,22 @@ const shop = new ShopClient('https://anuki.in');
 
 Resolution order: class → host → default. See the main README for advanced configuration.
 
+### Deep Imports
+
+Examples can deep import modules to reduce bundle size and speed up builds:
+
+```typescript
+// ESM
+import { configureRateLimit } from 'shop-search/rate-limit';
+import { fetchProducts } from 'shop-search/products';
+
+// CommonJS
+const { configureRateLimit } = require('shop-search/rate-limit');
+const { fetchProducts } = require('shop-search/products');
+```
+
+The library declares `sideEffects: false` and uses a lazily-started rate limiter timer, improving tree-shakeability.
+
 ## 📊 Expected Output
 
 ### Basic Example Output

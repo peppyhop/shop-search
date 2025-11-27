@@ -134,6 +134,12 @@ configureRateLimit({
 });
 ```
 
+Tree-Shaking & Subpath Exports
+- The rate limiter’s timer starts lazily on first use; there are no import-time side effects.
+- The package declares `sideEffects: false` and provides subpath exports for deep imports:
+  - `shop-search/products`, `shop-search/collections`, `shop-search/checkout`, `shop-search/store`, `shop-search/rate-limit`
+- Prefer deep imports for smaller bundles and faster builds.
+
 Date handling policy:
 - Product `createdAt` / `updatedAt` use safe parsing and may be `undefined` when the source is invalid.
 - Product `publishedAt` is `Date | null` and defaults to `null` when unavailable or invalid.
