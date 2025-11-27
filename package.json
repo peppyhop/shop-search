@@ -9,8 +9,34 @@
       "require": "./dist/index.js",
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.ts"
+    },
+    "./products": {
+      "require": "./dist/products.js",
+      "import": "./dist/products.mjs",
+      "types": "./dist/products.d.ts"
+    },
+    "./collections": {
+      "require": "./dist/collections.js",
+      "import": "./dist/collections.mjs",
+      "types": "./dist/collections.d.ts"
+    },
+    "./checkout": {
+      "require": "./dist/checkout.js",
+      "import": "./dist/checkout.mjs",
+      "types": "./dist/checkout.d.ts"
+    },
+    "./store": {
+      "require": "./dist/store.js",
+      "import": "./dist/store.mjs",
+      "types": "./dist/store.d.ts"
+    },
+    "./rate-limit": {
+      "require": "./dist/rate-limit.js",
+      "import": "./dist/rate-limit.mjs",
+      "types": "./dist/rate-limit.d.ts"
     }
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
