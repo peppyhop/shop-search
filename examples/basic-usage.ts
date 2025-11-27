@@ -4,10 +4,17 @@
  * This example demonstrates the basic functionality of the shop-search library
  * using the anuki.in Shopify store.
  */
+import { configureRateLimit, ShopClient } from "../src/index";
 
-import { ShopClient } from "../src/index";
 
 async function basicUsageExample() {
+  // Optional: enable a conservative global rate limiter to avoid 429s
+  configureRateLimit({
+    enabled: true,
+    maxRequestsPerInterval: 10,
+    intervalMs: 1000,
+    maxConcurrency: 3,
+  });
   // Initialize the shop client with anuki.in domain
   const shop = new ShopClient("https://anuki.in");
 

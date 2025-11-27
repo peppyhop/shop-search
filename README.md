@@ -49,6 +49,73 @@ const products = await shop.products.all();
 const product = await shop.products.find("product-handle");
 ```
 
+## 🛡️ Rate Limiting
+
+`shop-search` ships with an opt-in, global rate limiter that transparently throttles all internal HTTP requests (products, collections, store info, enrichment). This helps avoid `429 Too Many Requests` responses and keeps crawling stable.
+
+- Default: disabled
+- When enabled: defaults to `5` requests per `1000ms` with max concurrency `5`
+- Configure globally via `configureRateLimit`
+
+```typescript
+import { ShopClient, configureRateLimit } from 'shop-search';
+
+// Enable and configure the global rate limiter
+configureRateLimit({
+  enabled: true,
+  maxRequestsPerInterval: 60, // 60 requests
+  intervalMs: 60_000,         // per minute
+  maxConcurrency: 4,          // up to 4 in parallel
+});
+
+const shop = new ShopClient("your-store-domain.com");
+
+// All subsequent library calls use the limiter automatically
+const products = await shop.products.all();
+```
+
+Notes:
+- The limiter is global to the process. Call `configureRateLimit` once at startup.
+- If you are crawling multiple stores, prefer lower concurrency and a longer interval to reduce pressure.
+- When disabled, the library uses native `fetch` without throttling.
+
+### Advanced: Per-Host and Per-Class Limits
+
+You can set different buckets by host (including wildcards) or by logical class:
+
+```typescript
+import { configureRateLimit } from 'shop-search';
+
+configureRateLimit({
+  enabled: true,
+  // Default fallback
+  maxRequestsPerInterval: 10,
+  intervalMs: 1000,
+  maxConcurrency: 5,
+
+  // Host-specific buckets (exact host or wildcard suffix '*.example.com')
+  perHost: {
+    'openrouter.ai': { maxRequestsPerInterval: 2, intervalMs: 1000, maxConcurrency: 1 },
+    '*.myshopify.com': { maxRequestsPerInterval: 5, intervalMs: 1000, maxConcurrency: 3 },
+    'your-store-domain.com': { maxRequestsPerInterval: 8, intervalMs: 1000, maxConcurrency: 4 },
+  },
+
+  // Class-specific buckets (use by passing `rateLimitClass` in RequestInit)
+  perClass: {
+    openrouter: { maxRequestsPerInterval: 2, intervalMs: 1000, maxConcurrency: 1 },
+    shopify: { maxRequestsPerInterval: 6, intervalMs: 1000, maxConcurrency: 3 },
+  },
+});
+
+// If you make custom fetches, you can tag them with a class:
+// await rateLimitedFetch(url, { rateLimitClass: 'openrouter' });
+```
+
+Resolution order:
+- If `rateLimitClass` is present, that bucket is used.
+- Else, a matching `perHost` bucket is used (exact match first, then wildcard suffix).
+- Else, the global default bucket is used.
+
 ## 📚 API Reference
 
 ### Store Information

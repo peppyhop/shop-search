@@ -105,6 +105,35 @@ Shared utility functions support consistent normalization and parsing across mod
 - `sanitizeDomain(domain, options)`: Normalizes domains by removing protocols/paths and optionally preserving `www.`. Use this for any domain handling at entry points and when rendering store metadata.
 - `safeParseDate(input)`: Safely parses date strings; returns `undefined` for invalid/empty inputs. All DTOs and mappers should use this to avoid `Invalid Date` values in responses.
 
+#### Rate Limiting
+
+All internal HTTP requests are funneled through a global, opt-in rate limiter:
+
+- API: `configureRateLimit({ enabled, maxRequestsPerInterval, intervalMs, maxConcurrency, perHost, perClass })`
+- Mechanism: token-bucket refill per interval plus concurrency gating
+- Scope: products, collections, store info, and enrichment use `rateLimitedFetch`
+- Defaults (when enabled): 5 requests per 1000ms, max concurrency 5
+- Disabled by default; enable once at application startup
+
+Buckets:
+- Per-host buckets via `perHost` support exact hosts and wildcard suffix (e.g., `*.myshopify.com`).
+- Per-class buckets via `perClass` are chosen when `rateLimitClass` is set in RequestInit.
+
+Resolution order: class → host → default.
+
+Example:
+
+```typescript
+import { configureRateLimit } from 'shop-search';
+
+configureRateLimit({
+  enabled: true,
+  maxRequestsPerInterval: 60,
+  intervalMs: 60_000,
+  maxConcurrency: 4,
+});
+```
+
 Date handling policy:
 - Product `createdAt` / `updatedAt` use safe parsing and may be `undefined` when the source is invalid.
 - Product `publishedAt` is `Date | null` and defaults to `null` when unavailable or invalid.

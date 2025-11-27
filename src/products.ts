@@ -12,6 +12,7 @@ import {
   enrichProduct,
   generateSEOContent as generateSEOContentLLM,
 } from "./utils/enrich";
+import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
  * Interface for product operations
@@ -167,7 +168,7 @@ export function createProductOperations(
       const url = `${baseUrl}products.json?limit=${limit}&page=${page}`;
 
       try {
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         if (!response.ok) {
           console.error(
             `HTTP error! status: ${response.status} for ${storeDomain} page ${page}`
@@ -246,7 +247,7 @@ export function createProductOperations(
         }
 
         const url = `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}.js${qs ? `?${qs}` : ""}`;
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
 
         if (!response.ok) {
           if (response.status === 404) {

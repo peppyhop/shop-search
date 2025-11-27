@@ -1,6 +1,14 @@
-import { ShopClient } from "../src/index";
+import { configureRateLimit, ShopClient } from "../src/index";
 
 async function advancedUsageExample() {
+  // Enable and configure global rate limiting for all internal requests
+  configureRateLimit({
+    enabled: true,
+    maxRequestsPerInterval: 30, // 30 requests
+    intervalMs: 1000, // per second
+    maxConcurrency: 6, // up to 6 in parallel
+  });
+
   // Initialize the shop client with anuki.in domain
   const shop = new ShopClient("https://anuki.in");
 

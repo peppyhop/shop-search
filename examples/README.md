@@ -60,6 +60,28 @@ Both examples use `anuki.in` as the target domain. To use with your own store:
 2. Ensure your store is publicly accessible
 3. Verify your store has products and collections
 
+### Rate Limiting
+
+Examples can optionally enable the global rate limiter to avoid `429` responses when crawling:
+
+```typescript
+import { ShopClient, configureRateLimit } from '../src/index';
+
+configureRateLimit({
+  enabled: true,
+  maxRequestsPerInterval: 20,
+  intervalMs: 1000,
+  maxConcurrency: 4,
+  perHost: {
+    '*.myshopify.com': { maxRequestsPerInterval: 6, intervalMs: 1000, maxConcurrency: 3 },
+  },
+});
+
+const shop = new ShopClient('https://anuki.in');
+```
+
+Resolution order: class → host → default. See the main README for advanced configuration.
+
 ## 📊 Expected Output
 
 ### Basic Example Output
