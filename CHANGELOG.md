@@ -1,3 +1,9 @@
+## [3.6.0](https://github.com/peppyhop/shop-search/compare/v3.5.0...v3.6.0) (2025-11-28)
+
+### Features
+
+* **currency:** add localized pricing and currency override support ([#11](https://github.com/peppyhop/shop-search/issues/11)) ([32ae8c5](https://github.com/peppyhop/shop-search/commit/32ae8c52dc9eb7b7137c16a15d587653fd3126bf))
+
 ## [3.5.0](https://github.com/peppyhop/shop-search/compare/v3.4.0...v3.5.0) (2025-11-27)
 
 ### Features
