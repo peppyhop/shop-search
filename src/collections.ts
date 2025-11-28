@@ -1,6 +1,11 @@
 import { filter, isNonNullish } from "remeda";
 import type { StoreInfo } from "./store";
-import type { Collection, Product, ShopifyCollection } from "./types";
+import type {
+  Collection,
+  CurrencyCode,
+  Product,
+  ShopifyCollection,
+} from "./types";
 import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
@@ -31,13 +36,16 @@ export interface CollectionOperations {
      */
     paginated(
       collectionHandle: string,
-      options?: { page?: number; limit?: number }
+      options?: { page?: number; limit?: number; currency?: CurrencyCode }
     ): Promise<Product[] | null>;
 
     /**
      * Fetches all products from a specific collection.
      */
-    all(collectionHandle: string): Promise<Product[] | null>;
+    all(
+      collectionHandle: string,
+      options?: { currency?: CurrencyCode }
+    ): Promise<Product[] | null>;
     /**
      * Fetches all product slugs from a specific collection.
      */
@@ -63,6 +71,47 @@ export function createCollectionOperations(
   getStoreInfo: () => Promise<StoreInfo>,
   findCollection: (handle: string) => Promise<Collection | null>
 ): CollectionOperations {
+  function formatPrice(amountInCents: number, currency: CurrencyCode): string {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+      }).format((amountInCents || 0) / 100);
+    } catch {
+      const val = (amountInCents || 0) / 100;
+      return `${val} ${currency}`;
+    }
+  }
+
+  function applyCurrencyOverride(
+    product: Product,
+    currency: CurrencyCode
+  ): Product {
+    const priceMin = product.priceMin ?? product.price ?? 0;
+    const priceMax = product.priceMax ?? product.price ?? 0;
+    const compareAtMin =
+      product.compareAtPriceMin ?? product.compareAtPrice ?? 0;
+    return {
+      ...product,
+      currency,
+      localizedPricing: {
+        currency,
+        priceFormatted: formatPrice(priceMin, currency),
+        priceMinFormatted: formatPrice(priceMin, currency),
+        priceMaxFormatted: formatPrice(priceMax, currency),
+        compareAtPriceFormatted: formatPrice(compareAtMin, currency),
+      },
+    };
+  }
+
+  function maybeOverrideProductsCurrency(
+    products: Product[] | null,
+    currency?: CurrencyCode
+  ): Product[] | null {
+    if (!products || !currency) return products;
+    return products.map((p) => applyCurrencyOverride(p, currency));
+  }
+
   return {
     /**
      * Fetches all collections from the store across all pages.
@@ -275,32 +324,29 @@ export function createCollectionOperations(
        */
       paginated: async (
         collectionHandle: string,
-        options?: {
-          page?: number;
-          limit?: number;
-        }
+        options?: { page?: number; limit?: number; currency?: CurrencyCode }
       ) => {
         // Validate collection handle
         if (!collectionHandle || typeof collectionHandle !== "string") {
           throw new Error("Collection handle is required and must be a string");
         }
-
         // Sanitize handle - remove potentially dangerous characters
         const sanitizedHandle = collectionHandle
           .trim()
           .replace(/[^a-zA-Z0-9\-_]/g, "");
+
         if (!sanitizedHandle) {
           throw new Error("Invalid collection handle format");
         }
 
-        // Check handle length (reasonable limits)
         if (sanitizedHandle.length > 255) {
+          // Check handle length (reasonable limits)
           throw new Error("Collection handle is too long");
         }
 
         // Validate pagination options
-        const page = options?.page || 1;
-        const limit = options?.limit || 250;
+        const page = options?.page ?? 1;
+        const limit = options?.limit ?? 250;
 
         if (page < 1 || limit < 1 || limit > 250) {
           throw new Error(
@@ -308,10 +354,11 @@ export function createCollectionOperations(
           );
         }
 
-        return fetchPaginatedProductsFromCollection(sanitizedHandle, {
-          page,
-          limit,
-        });
+        const products = await fetchPaginatedProductsFromCollection(
+          sanitizedHandle,
+          { page, limit }
+        );
+        return maybeOverrideProductsCurrency(products, options?.currency);
       },
 
       /**
@@ -336,7 +383,10 @@ export function createCollectionOperations(
        * }
        * ```
        */
-      all: async (collectionHandle: string): Promise<Product[] | null> => {
+      all: async (
+        collectionHandle: string,
+        options?: { currency?: CurrencyCode }
+      ): Promise<Product[] | null> => {
         // Validate collection handle
         if (!collectionHandle || typeof collectionHandle !== "string") {
           throw new Error("Collection handle is required and must be a string");
@@ -381,7 +431,7 @@ export function createCollectionOperations(
             currentPage++;
           }
 
-          return allProducts;
+          return maybeOverrideProductsCurrency(allProducts, options?.currency);
         } catch (error) {
           console.error(
             `Error fetching all products for collection ${sanitizedHandle}:`,

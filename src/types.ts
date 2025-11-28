@@ -5,7 +5,6 @@
  * including Shopify API response types, normalized product/collection types, and utility types.
  *
  * @author shop-search
- * @version 2.1.2
  */
 
 // Simplified version of RequireAtLeastOne utility type
@@ -280,6 +279,23 @@ export type ProductPricing = {
 };
 
 /**
+ * Localized/display pricing with currency-aware formatted strings.
+ */
+export type LocalizedPricing = {
+  currency: string;
+  priceFormatted: string;
+  priceMinFormatted: string;
+  priceMaxFormatted: string;
+  compareAtPriceFormatted: string;
+};
+
+/**
+ * ISO 4217 currency code type aligned with Intl.NumberFormat expectations.
+ * Example values: "USD", "EUR", "GBP".
+ */
+export type CurrencyCode = NonNullable<Intl.NumberFormatOptions["currency"]>;
+
+/**
  * Product option structure (e.g., Size, Color) for normalized products.
  */
 export type ProductOption = {
@@ -374,6 +390,7 @@ export type Product = {
   compareAtPriceVaries: boolean;
   discount: number;
   currency?: string;
+  localizedPricing?: LocalizedPricing;
   options: ProductOption[];
   bodyHtml: string | null;
   active?: boolean;
@@ -527,6 +544,8 @@ export type CountryDetectionResult = {
   confidence: number;
   /** Array of detection signals that contributed to the result */
   signals: string[];
+  /** Detected currency code (e.g., "USD", "INR") if available */
+  currencyCode?: string;
 };
 
 /**

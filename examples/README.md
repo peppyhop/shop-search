@@ -50,6 +50,35 @@ npx ts-node examples/basic-usage.ts
 ### Running Advanced Example
 ```bash
 npx ts-node examples/advanced-usage.ts
+
+### Browser Example (CDN ESM)
+If you want to run `shop-search` directly in the browser without a bundler, use a CDN that serves ESM with the correct JavaScript MIME type:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "shop-search": "https://cdn.jsdelivr.net/npm/shop-search/+esm"
+  }
+}
+</script>
+
+<script type="module">
+  import { ShopClient } from 'shop-search';
+  const shop = new ShopClient('https://anuki.in');
+  console.log(await shop.getInfo());
+  console.log(await shop.products.paginated({ page: 1, limit: 12 }));
+  console.log(await shop.collections.products.paginated('new-arrivals', { page: 1, limit: 12 }));
+}</script>
+```
+
+Alternative CDNs:
+- `https://esm.sh/shop-search@3.5.0`
+- `https://unpkg.com/shop-search@3.5.0?module`
+
+Troubleshooting:
+- Ensure the CDN returns `Content-Type: application/javascript`. The `+esm`/`?module` hints enforce ESM delivery.
+- If dynamically creating a blob, set `type: 'text/javascript'` when constructing it.
 ```
 
 ## 🔧 Configuration

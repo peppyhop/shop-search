@@ -49,6 +49,63 @@ const products = await shop.products.all();
 const product = await shop.products.find("product-handle");
 ```
 
+## Browser Usage
+
+Some in-browser environments load npm packages via blob URLs and can error if the content is not served with a JavaScript MIME type (e.g., “Modules must be served with a valid MIME type like application/javascript”). To use `shop-search` directly in the browser, import the ESM build from a CDN that sets the correct `Content-Type`:
+
+```html
+<!-- Import map to pin shop-search to a CDN ESM URL -->
+<script type="importmap">
+{
+  "imports": {
+    "shop-search": "https://cdn.jsdelivr.net/npm/shop-search/+esm"
+  }
+}
+</script>
+
+<script type="module">
+  import { ShopClient } from 'shop-search';
+  const shop = new ShopClient('https://example.myshopify.com/');
+  const info = await shop.getInfo();
+  console.log(info);
+  const products = await shop.products.paginated({ page: 1, limit: 24 });
+  console.log(products);
+  // For collections:
+  const colProducts = await shop.collections.products.paginated('mens', { page: 1, limit: 24 });
+  console.log(colProducts);
+}</script>
+```
+
+Alternative CDN URLs:
+- `https://esm.sh/shop-search@3.5.0`
+- `https://unpkg.com/shop-search@3.5.0?module`
+
+Troubleshooting:
+- Ensure the CDN returns `Content-Type: application/javascript`. The `+esm` and `?module` suffixes enforce ESM delivery.
+- If you build your own blob, set `new Blob(code, { type: 'text/javascript' })` before `import()`.
+- For app frameworks (Vite, Next.js), import `shop-search` normally and let the bundler serve modules.
+
+## Server/Edge Usage
+
+For robust production setups, run `shop-search` on the server or an edge function and return JSON to the browser:
+
+```ts
+// /api/shop-info.ts (Edge/Node)
+import { ShopClient } from 'shop-search';
+
+export default async function handler(req, res) {
+  const shop = new ShopClient('https://example.myshopify.com/');
+  const info = await shop.getInfo();
+  res.json(info);
+}
+```
+
+Client:
+
+```ts
+const info = await fetch('/api/shop-info').then(r => r.json());
+```
+
 ## Deep Imports & Tree-Shaking
 
 For optimal bundle size, import only what you need using subpath exports. The library ships ESM/CJS builds and declares `sideEffects: false` for better dead code elimination.
@@ -225,13 +282,16 @@ Fetches products with manual pagination control.
 ```typescript
 const products = await shop.products.paginated({
   page: 1,
-  limit: 25
+  limit: 25,
+  // Optional currency override aligned with Intl.NumberFormat
+  currency: "EUR",
 });
 ```
 
 **Parameters:**
 - `page` (number, optional): Page number (default: 1)
 - `limit` (number, optional): Products per page (default: 250, max: 250)
+ - `currency` (CurrencyCode, optional): ISO 4217 code aligned with `Intl.NumberFormatOptions['currency']` (e.g., `"USD"`, `"EUR"`, `"JPY"`)
 
 **Returns:** `Product[]` - Array of products for the specified page
 
@@ -241,10 +301,15 @@ Finds a specific product by its handle.
 
 ```typescript
 const product = await shop.products.find("product-handle");
+
+// With currency override
+const productEur = await shop.products.find("product-handle", { currency: "EUR" });
 ```
 
 **Parameters:**
 - `handle` (string): The product handle/slug
+ - `options` (object, optional): Additional options
+   - `currency` (CurrencyCode, optional): ISO 4217 code aligned with `Intl.NumberFormatOptions['currency']`
 
 **Returns:** `Product | null` - Product object or null if not found
 
@@ -344,7 +409,8 @@ Fetches products from a collection with pagination.
 ```typescript
 const products = await shop.collections.products.paginated("collection-handle", {
   page: 1,
-  limit: 25
+  limit: 25,
+  currency: "GBP",
 });
 ```
 
@@ -353,8 +419,29 @@ const products = await shop.collections.products.paginated("collection-handle", 
 - `options` (object): Pagination options
   - `page` (number, optional): Page number (default: 1)
   - `limit` (number, optional): Products per page (default: 250)
+  - `currency` (CurrencyCode, optional): ISO 4217 code aligned with `Intl.NumberFormatOptions['currency']`
 
 **Returns:** `Product[]` - Array of products for the specified page
+
+#### Currency Override
+
+By default, pricing is formatted using the store’s detected currency.
+You can override the currency for product and collection queries by passing a `currency` option.
+This override updates `Product.currency` and `Product.localizedPricing.currency` (and related formatted strings) only.
+
+```typescript
+// Products
+await shop.products.paginated({ page: 1, limit: 25, currency: "EUR" });
+await shop.products.all({ currency: "JPY" });
+await shop.products.find("product-handle", { currency: "GBP" });
+
+// Collection products
+await shop.collections.products.paginated("collection-handle", { page: 1, limit: 25, currency: "CAD" });
+await shop.collections.products.all("collection-handle", { currency: "AUD" });
+```
+
+Type: `CurrencyCode` is defined as `NonNullable<Intl.NumberFormatOptions['currency']>`.
+This ensures compatibility with `Intl.NumberFormat` and avoids maintaining a hardcoded list.
 
 ### Checkout
 
