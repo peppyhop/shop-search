@@ -24,6 +24,7 @@ const COUNTRY_CODES: Record<string, string> = {
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
+  Rs: "IN", // India
   "₹": "IN", // India
   $: "US", // United States (primary, though many countries use $)
   CA$: "CA", // Canada
@@ -33,6 +34,34 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   AED: "AE", // United Arab Emirates
   "₩": "KR", // South Korea
   "¥": "JP", // Japan (primary, though China also uses ¥)
+};
+
+// Map currency symbols commonly found in Shopify money formats to ISO currency codes
+const CURRENCY_SYMBOL_TO_CODE: Record<string, string> = {
+  Rs: "INR",
+  "₹": "INR",
+  $: "USD",
+  CA$: "CAD",
+  A$: "AUD",
+  "£": "GBP",
+  "€": "EUR",
+  AED: "AED",
+  "₩": "KRW",
+  "¥": "JPY",
+};
+
+// Map Shopify currency codes to likely ISO country codes
+// Note: Some codes (e.g., USD, EUR) are used by multiple countries; we treat them as signals.
+const CURRENCY_CODE_TO_COUNTRY: Record<string, string> = {
+  INR: "IN",
+  USD: "US",
+  CAD: "CA",
+  AUD: "AU",
+  GBP: "GB",
+  EUR: "EU",
+  AED: "AE",
+  KRW: "KR",
+  JPY: "JP",
 };
 
 function scoreCountry(
@@ -79,6 +108,7 @@ export async function detectShopifyCountry(
   html: string
 ): Promise<CountryDetectionResult> {
   const countryScores: CountryScores = {};
+  let detectedCurrencyCode: string | undefined;
 
   // 1️⃣ Extract Shopify features JSON
   const shopifyFeaturesMatch = html.match(
@@ -112,9 +142,18 @@ export async function detectShopifyCountry(
         if (data.moneyFormat) {
           for (const symbol in CURRENCY_SYMBOLS) {
             if (data.moneyFormat.includes(symbol)) {
-              const iso = CURRENCY_SYMBOLS[symbol];
-              if (iso) {
+              const iso =
+                CURRENCY_SYMBOLS[symbol as keyof typeof CURRENCY_SYMBOLS];
+              if (typeof iso === "string") {
                 scoreCountry(countryScores, iso, 0.6, "moneyFormat symbol");
+              }
+              // Also capture currency code if symbol is recognized
+              const code =
+                CURRENCY_SYMBOL_TO_CODE[
+                  symbol as keyof typeof CURRENCY_SYMBOL_TO_CODE
+                ];
+              if (!detectedCurrencyCode && typeof code === "string") {
+                detectedCurrencyCode = code;
               }
             }
           }
@@ -122,6 +161,60 @@ export async function detectShopifyCountry(
       }
     } catch (_error) {
       // Silently handle JSON parsing errors
+    }
+  }
+
+  // 1️⃣ b) Detect Shopify.currency active code (common across many Shopify themes)
+  // Example: Shopify.currency = {"active":"INR","rate":"1.0"};
+  // Fallback pattern: Shopify.currency.active = 'INR';
+  const currencyJsonMatch = html.match(/Shopify\.currency\s*=\s*(\{[^}]*\})/);
+  if (currencyJsonMatch) {
+    try {
+      const raw = currencyJsonMatch[1];
+      const obj = JSON.parse(raw || "{}") as any;
+      const activeCode =
+        typeof obj?.active === "string" ? obj.active.toUpperCase() : undefined;
+      const iso = activeCode ? CURRENCY_CODE_TO_COUNTRY[activeCode] : undefined;
+      if (activeCode) {
+        detectedCurrencyCode = activeCode;
+      }
+      if (typeof iso === "string") {
+        // Treat as a strong signal
+        scoreCountry(countryScores, iso, 0.8, "Shopify.currency.active");
+      }
+    } catch (_error) {
+      // ignore malformed objects
+    }
+  } else {
+    const currencyActiveAssignMatch = html.match(
+      /Shopify\.currency\.active\s*=\s*['"]([A-Za-z]{3})['"]/i
+    );
+    if (currencyActiveAssignMatch) {
+      const captured = currencyActiveAssignMatch[1];
+      const code =
+        typeof captured === "string" ? captured.toUpperCase() : undefined;
+      const iso = code ? CURRENCY_CODE_TO_COUNTRY[code] : undefined;
+      if (code) {
+        detectedCurrencyCode = code;
+      }
+      if (typeof iso === "string") {
+        scoreCountry(countryScores, iso, 0.8, "Shopify.currency.active");
+      }
+    }
+  }
+
+  // 1️⃣ c) Detect explicit Shopify.country assignment
+  // Example: Shopify.country = "IN";
+  const shopifyCountryMatch = html.match(
+    /Shopify\.country\s*=\s*['"]([A-Za-z]{2})['"]/i
+  );
+  if (shopifyCountryMatch) {
+    const captured = shopifyCountryMatch[1];
+    const iso =
+      typeof captured === "string" ? captured.toUpperCase() : undefined;
+    if (typeof iso === "string") {
+      // Treat as strongest signal
+      scoreCountry(countryScores, iso, 1, "Shopify.country");
     }
   }
 
@@ -231,6 +324,12 @@ export async function detectShopifyCountry(
         country: best[0],
         confidence: Math.min(1, best[1].score / 2),
         signals: best[1].reasons,
+        currencyCode: detectedCurrencyCode,
       }
-    : { country: "Unknown", confidence: 0, signals: [] };
+    : {
+        country: "Unknown",
+        confidence: 0,
+        signals: [],
+        currencyCode: detectedCurrencyCode,
+      };
 }

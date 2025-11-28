@@ -1,6 +1,7 @@
 import { filter, isNonNullish } from "remeda";
 import type { StoreInfo } from "./store";
 import type {
+  CurrencyCode,
   Product,
   ProductClassification,
   SEOContent,
@@ -21,7 +22,7 @@ export interface ProductOperations {
   /**
    * Fetches all products from the store across all pages.
    */
-  all(): Promise<Product[] | null>;
+  all(options?: { currency?: CurrencyCode }): Promise<Product[] | null>;
 
   /**
    * Fetches products with pagination support.
@@ -29,12 +30,16 @@ export interface ProductOperations {
   paginated(options?: {
     page?: number;
     limit?: number;
+    currency?: CurrencyCode;
   }): Promise<Product[] | null>;
 
   /**
    * Finds a specific product by its handle.
    */
-  find(productHandle: string): Promise<Product | null>;
+  find(
+    productHandle: string,
+    options?: { currency?: CurrencyCode }
+  ): Promise<Product | null>;
 
   /**
    * Finds a product by handle and enriches its content using LLM.
@@ -86,6 +91,47 @@ export function createProductOperations(
   getStoreInfo: () => Promise<StoreInfo>,
   findProduct: (handle: string) => Promise<Product | null>
 ): ProductOperations {
+  function formatPrice(amountInCents: number, currency: CurrencyCode): string {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+      }).format((amountInCents || 0) / 100);
+    } catch {
+      const val = (amountInCents || 0) / 100;
+      return `${val} ${currency}`;
+    }
+  }
+
+  function applyCurrencyOverride(
+    product: Product,
+    currency: CurrencyCode
+  ): Product {
+    const priceMin = product.priceMin ?? product.price ?? 0;
+    const priceMax = product.priceMax ?? product.price ?? 0;
+    const compareAtMin =
+      product.compareAtPriceMin ?? product.compareAtPrice ?? 0;
+    return {
+      ...product,
+      currency,
+      localizedPricing: {
+        currency,
+        priceFormatted: formatPrice(priceMin, currency),
+        priceMinFormatted: formatPrice(priceMin, currency),
+        priceMaxFormatted: formatPrice(priceMax, currency),
+        compareAtPriceFormatted: formatPrice(compareAtMin, currency),
+      },
+    };
+  }
+
+  function maybeOverrideProductsCurrency(
+    products: Product[] | null,
+    currency?: CurrencyCode
+  ): Product[] | null {
+    if (!products || !currency) return products;
+    return products.map((p) => applyCurrencyOverride(p, currency));
+  }
+
   const operations: ProductOperations = {
     /**
      * Fetches all products from the store across all pages.
@@ -105,7 +151,9 @@ export function createProductOperations(
      * });
      * ```
      */
-    all: async (): Promise<Product[] | null> => {
+    all: async (options?: {
+      currency?: CurrencyCode;
+    }): Promise<Product[] | null> => {
       const limit = 250;
       const allProducts: Product[] = [];
 
@@ -130,7 +178,7 @@ export function createProductOperations(
 
       try {
         const products = await fetchAll();
-        return products;
+        return maybeOverrideProductsCurrency(products, options?.currency);
       } catch (error) {
         console.error("Failed to fetch all products:", storeDomain, error);
         throw error;
@@ -162,6 +210,7 @@ export function createProductOperations(
     paginated: async (options?: {
       page?: number;
       limit?: number;
+      currency?: CurrencyCode;
     }): Promise<Product[] | null> => {
       const page = options?.page ?? 1;
       const limit = Math.min(options?.limit ?? 250, 250);
@@ -182,7 +231,8 @@ export function createProductOperations(
         if (data.products.length === 0) {
           return [];
         }
-        return productsDto(data.products);
+        const normalized = productsDto(data.products);
+        return maybeOverrideProductsCurrency(normalized, options?.currency);
       } catch (error) {
         console.error(
           `Error fetching products for ${storeDomain} page ${page} with limit ${limit}:`,
@@ -217,7 +267,10 @@ export function createProductOperations(
      * const productWithVariant = await shop.products.find('t-shirt?variant=123');
      * ```
      */
-    find: async (productHandle: string): Promise<Product | null> => {
+    find: async (
+      productHandle: string,
+      options?: { currency?: CurrencyCode }
+    ): Promise<Product | null> => {
       // Validate product handle
       if (!productHandle || typeof productHandle !== "string") {
         throw new Error("Product handle is required and must be a string");
@@ -246,7 +299,29 @@ export function createProductOperations(
           throw new Error("Product handle is too long");
         }
 
-        const url = `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}.js${qs ? `?${qs}` : ""}`;
+        // Resolve canonical handle via HTML redirect if handle has changed
+        let finalHandle = sanitizedHandle;
+        try {
+          const htmlResp = await rateLimitedFetch(
+            `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}`
+          );
+          if (htmlResp.ok) {
+            const finalUrl = htmlResp.url;
+            if (finalUrl) {
+              const pathname = new URL(finalUrl).pathname.replace(/\/$/, "");
+              const parts = pathname.split("/").filter(Boolean);
+              const idx = parts.indexOf("products");
+              const maybeHandle = idx >= 0 ? parts[idx + 1] : undefined;
+              if (typeof maybeHandle === "string" && maybeHandle.length) {
+                finalHandle = maybeHandle;
+              }
+            }
+          }
+        } catch {
+          // Ignore redirect resolution errors and proceed with original handle
+        }
+
+        const url = `${baseUrl}products/${encodeURIComponent(finalHandle)}.js${qs ? `?${qs}` : ""}`;
         const response = await rateLimitedFetch(url);
 
         if (!response.ok) {
@@ -258,7 +333,9 @@ export function createProductOperations(
 
         const product = (await response.json()) as ShopifySingleProduct;
         const productData = productDto(product);
-        return productData;
+        return options?.currency
+          ? applyCurrencyOverride(productData, options.currency)
+          : productData;
       } catch (error) {
         if (error instanceof Error) {
           console.error(

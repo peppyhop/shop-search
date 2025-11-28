@@ -51,6 +51,7 @@ export class ShopClient {
   private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes cache expiry
   private cacheTimestamps: Map<string, number> = new Map();
   private normalizeImageUrlCache: Map<string, string> = new Map();
+  private storeCurrency?: string;
 
   // Public operations interfaces
   public products: ProductOperations;
@@ -194,6 +195,22 @@ export class ShopClient {
   }
 
   /**
+   * Format a price amount (in cents) using the store currency.
+   */
+  private formatPrice(amountInCents: number): string {
+    const currency = this.storeCurrency ?? "USD";
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+      }).format((amountInCents || 0) / 100);
+    } catch {
+      const val = (amountInCents || 0) / 100;
+      return `${val} ${currency}`;
+    }
+  }
+
+  /**
    * Transform Shopify products to our Product format
    */
   productsDto(products: ShopifyProduct[]): Product[] | null {
@@ -292,7 +309,14 @@ export class ShopClient {
         compareAtPriceMax: compareAtMax,
         compareAtPriceVaries: compareAtVaries,
         discount: 0, // Calculate if needed
-        currency: "USD", // Default or extract from store
+        currency: this.storeCurrency ?? "USD",
+        localizedPricing: {
+          currency: this.storeCurrency ?? "USD",
+          priceFormatted: this.formatPrice(priceMin),
+          priceMinFormatted: this.formatPrice(priceMin),
+          priceMaxFormatted: this.formatPrice(priceMax),
+          compareAtPriceFormatted: this.formatPrice(compareAtMin),
+        },
         options: product.options.map((option) => ({
           key: normalizeKey(option.name),
           data: option.values,
@@ -363,7 +387,16 @@ export class ShopClient {
       compareAtPriceMax: product.compare_at_price_max, // Already in correct format (cents as integer)
       compareAtPriceVaries: product.compare_at_price_varies,
       discount: 0, // Calculate if needed
-      currency: "USD", // Default or extract from store
+      currency: this.storeCurrency ?? "USD",
+      localizedPricing: {
+        currency: this.storeCurrency ?? "USD",
+        priceFormatted: this.formatPrice(product.price),
+        priceMinFormatted: this.formatPrice(product.price_min),
+        priceMaxFormatted: this.formatPrice(product.price_max),
+        compareAtPriceFormatted: this.formatPrice(
+          product.compare_at_price || 0
+        ),
+      },
       options: product.options.map((option) => ({
         key: normalizeKey(option.name),
         data: option.values,
@@ -575,7 +608,29 @@ export class ShopClient {
   ) {
     try {
       const { page = 1, limit = 250 } = options;
-      const url = `${this.baseUrl}collections/${collectionHandle}/products.json?page=${page}&limit=${limit}`;
+      // Resolve canonical collection handle via HTML redirect if handle has changed
+      let finalHandle = collectionHandle;
+      try {
+        const htmlResp = await rateLimitedFetch(
+          `${this.baseUrl}collections/${encodeURIComponent(collectionHandle)}`
+        );
+        if (htmlResp.ok) {
+          const finalUrl = htmlResp.url;
+          if (finalUrl) {
+            const pathname = new URL(finalUrl).pathname.replace(/\/$/, "");
+            const parts = pathname.split("/").filter(Boolean);
+            const idx = parts.indexOf("collections");
+            const maybeHandle = idx >= 0 ? parts[idx + 1] : undefined;
+            if (typeof maybeHandle === "string" && maybeHandle.length) {
+              finalHandle = maybeHandle;
+            }
+          }
+        }
+      } catch {
+        // Ignore redirect resolution errors and proceed with original handle
+      }
+
+      const url = `${this.baseUrl}collections/${finalHandle}/products.json?page=${page}&limit=${limit}`;
       const response = await rateLimitedFetch(url);
 
       if (!response.ok) {
@@ -908,6 +963,12 @@ export class ShopClient {
 
       // Detect country information
       const countryDetection = await detectShopifyCountry(html);
+      if (
+        countryDetection &&
+        typeof (countryDetection as any).currencyCode === "string"
+      ) {
+        this.storeCurrency = (countryDetection as any).currencyCode;
+      }
 
       return {
         name: name || slug,
