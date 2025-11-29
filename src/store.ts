@@ -1,8 +1,5 @@
-import { unique } from "remeda";
+import { getInfoForStore } from "./client/get-info";
 import type { CountryDetectionResult, JsonLdEntry } from "./types";
-import { detectShopifyCountry } from "./utils/detect-country";
-import { extractDomainWithoutSuffix, generateStoreSlug } from "./utils/func";
-import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
  * Store operations interface for managing store-related functionality.
@@ -93,7 +90,16 @@ export function createStoreOperations(context: {
      */
     info: async (): Promise<StoreInfo> => {
       try {
-        const response = await rateLimitedFetch(context.baseUrl);
+        // Delegate to shared client parser to avoid redundancy
+        const { info } = await getInfoForStore({
+          baseUrl: context.baseUrl,
+          storeDomain: context.storeDomain,
+          validateProductExists: context.validateProductExists,
+          validateCollectionExists: context.validateCollectionExists,
+          validateLinksInBatches: context.validateLinksInBatches,
+        });
+        return info;
+        /* const response = await rateLimitedFetch(context.baseUrl);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -306,6 +312,7 @@ export function createStoreOperations(context: {
           },
           country: countryDetection?.country || "",
         };
+        */
       } catch (error) {
         context.handleFetchError(error, "fetching store info", context.baseUrl);
       }

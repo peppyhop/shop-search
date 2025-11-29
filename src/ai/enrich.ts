@@ -6,7 +6,7 @@ import type {
   SEOContent,
   ShopifySingleProduct,
 } from "../types";
-import { rateLimitedFetch } from "./rate-limit";
+import { rateLimitedFetch } from "../utils/rate-limit";
 
 function ensureOpenRouter(apiKey?: string) {
   const key = apiKey || process.env.OPENROUTER_API_KEY;

@@ -1,4 +1,9 @@
 import { filter, isNonNullish } from "remeda";
+import {
+  classifyProduct,
+  enrichProduct,
+  generateSEOContent as generateSEOContentLLM,
+} from "./ai/enrich";
 import type { StoreInfo } from "./store";
 import type {
   CurrencyCode,
@@ -8,11 +13,7 @@ import type {
   ShopifyProduct,
   ShopifySingleProduct,
 } from "./types";
-import {
-  classifyProduct,
-  enrichProduct,
-  generateSEOContent as generateSEOContentLLM,
-} from "./utils/enrich";
+import { formatPrice } from "./utils/func";
 import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
@@ -91,17 +92,7 @@ export function createProductOperations(
   getStoreInfo: () => Promise<StoreInfo>,
   findProduct: (handle: string) => Promise<Product | null>
 ): ProductOperations {
-  function formatPrice(amountInCents: number, currency: CurrencyCode): string {
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency,
-      }).format((amountInCents || 0) / 100);
-    } catch {
-      const val = (amountInCents || 0) / 100;
-      return `${val} ${currency}`;
-    }
-  }
+  // Use shared formatter from utils
 
   function applyCurrencyOverride(
     product: Product,

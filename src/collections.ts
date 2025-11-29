@@ -6,6 +6,7 @@ import type {
   Product,
   ShopifyCollection,
 } from "./types";
+import { formatPrice } from "./utils/func";
 import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
@@ -71,17 +72,7 @@ export function createCollectionOperations(
   getStoreInfo: () => Promise<StoreInfo>,
   findCollection: (handle: string) => Promise<Collection | null>
 ): CollectionOperations {
-  function formatPrice(amountInCents: number, currency: CurrencyCode): string {
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency,
-      }).format((amountInCents || 0) / 100);
-    } catch {
-      const val = (amountInCents || 0) / 100;
-      return `${val} ${currency}`;
-    }
-  }
+  // Use shared formatter from utils
 
   function applyCurrencyOverride(
     product: Product,

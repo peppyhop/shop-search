@@ -1,4 +1,4 @@
-import * as enrich from "../utils/enrich";
+import * as enrich from "../ai/enrich";
 import type { ShopifySingleProduct } from "../types";
 
 describe("enrichProduct JSON image sanitization", () => {
