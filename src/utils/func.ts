@@ -1,4 +1,5 @@
 import { parse } from "tldts";
+import type { CurrencyCode } from "../types";
 
 export function extractDomainWithoutSuffix(domain: string) {
   const parsedDomain = parse(domain);
@@ -174,4 +175,23 @@ export function buildVariantKey(
   if (parts.length === 0) return "";
   parts.sort((a, b) => a.localeCompare(b));
   return parts.join("##");
+}
+
+/**
+ * Format a price amount (in cents) using a given ISO 4217 currency code.
+ * Falls back to a simple string when Intl formatting fails.
+ */
+export function formatPrice(
+  amountInCents: number,
+  currency: CurrencyCode
+): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+    }).format((amountInCents || 0) / 100);
+  } catch {
+    const val = (amountInCents || 0) / 100;
+    return `${val} ${currency}`;
+  }
 }

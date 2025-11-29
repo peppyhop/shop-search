@@ -1,8 +1,11 @@
-import { unique } from "remeda";
+import { determineStoreTypeForStore } from "./ai/determine-store-type";
 import type { CheckoutOperations } from "./checkout";
 import { createCheckoutOperations } from "./checkout";
+import { getInfoForStore } from "./client/get-info";
 import type { CollectionOperations } from "./collections";
 import { createCollectionOperations } from "./collections";
+import { collectionsDto as dtoCollections } from "./dto/collections.dto";
+import { mapProductDto, mapProductsDto } from "./dto/products.mapped";
 import type { ProductOperations } from "./products";
 import { createProductOperations } from "./products";
 import type { StoreInfo, StoreOperations } from "./store";
@@ -15,16 +18,7 @@ import type {
   ShopifySingleProduct,
   StoreTypeBreakdown,
 } from "./types";
-import { detectShopifyCountry } from "./utils/detect-country";
-import {
-  buildVariantOptionsMap,
-  extractDomainWithoutSuffix,
-  generateStoreSlug,
-  genProductSlug,
-  normalizeKey,
-  safeParseDate,
-  sanitizeDomain,
-} from "./utils/func";
+import { generateStoreSlug } from "./utils/func";
 import { rateLimitedFetch } from "./utils/rate-limit";
 
 /**
@@ -214,298 +208,27 @@ export class ShopClient {
    * Transform Shopify products to our Product format
    */
   productsDto(products: ShopifyProduct[]): Product[] | null {
-    if (!products || products.length === 0) {
-      return null;
-    }
-    return products.map((product) => {
-      const optionNames = product.options.map((o) => o.name);
-      const variantOptionsMap = buildVariantOptionsMap(
-        optionNames,
-        product.variants
-      );
-      // Map variants once and reuse for price stats and output
-      const mappedVariants = product.variants.map((variant) => ({
-        id: variant.id.toString(),
-        platformId: variant.id.toString(),
-        name: variant.name,
-        title: variant.title,
-        option1: variant.option1 || null,
-        option2: variant.option2 || null,
-        option3: variant.option3 || null,
-        options: [variant.option1, variant.option2, variant.option3].filter(
-          Boolean
-        ) as string[],
-        sku: variant.sku || null,
-        requiresShipping: variant.requires_shipping,
-        taxable: variant.taxable,
-        featuredImage: variant.featured_image
-          ? {
-              id: variant.featured_image.id,
-              src: variant.featured_image.src,
-              width: variant.featured_image.width,
-              height: variant.featured_image.height,
-              position: variant.featured_image.position,
-              productId: variant.featured_image.product_id,
-              aspectRatio: variant.featured_image.aspect_ratio,
-              variantIds: variant.featured_image.variant_ids || [],
-              createdAt: variant.featured_image.created_at,
-              updatedAt: variant.featured_image.updated_at,
-              alt: variant.featured_image.alt,
-            }
-          : null,
-        available: variant.available,
-        price:
-          typeof variant.price === "string"
-            ? Number.parseFloat(variant.price) * 100
-            : variant.price,
-        weightInGrams: variant.weightInGrams,
-        compareAtPrice: variant.compare_at_price
-          ? typeof variant.compare_at_price === "string"
-            ? Number.parseFloat(variant.compare_at_price) * 100
-            : variant.compare_at_price
-          : 0,
-        position: variant.position,
-        productId: variant.product_id,
-        createdAt: variant.created_at,
-        updatedAt: variant.updated_at,
-      }));
-
-      // Precompute price arrays once
-      const priceValues = mappedVariants
-        .map((v) => v.price)
-        .filter((p) => typeof p === "number" && !Number.isNaN(p));
-      const compareAtValues = mappedVariants
-        .map((v) => v.compareAtPrice || 0)
-        .filter((p) => typeof p === "number" && !Number.isNaN(p));
-
-      const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
-      const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
-      const priceVaries = mappedVariants.length > 1 && priceMin !== priceMax;
-
-      const compareAtMin = compareAtValues.length
-        ? Math.min(...compareAtValues)
-        : 0;
-      const compareAtMax = compareAtValues.length
-        ? Math.max(...compareAtValues)
-        : 0;
-      const compareAtVaries =
-        mappedVariants.length > 1 && compareAtMin !== compareAtMax;
-
-      return {
-        slug: genProductSlug({
-          handle: product.handle,
-          storeDomain: this.storeDomain,
-        }),
-        handle: product.handle,
-        platformId: product.id.toString(),
-        title: product.title,
-        available: mappedVariants.some((v) => v.available),
-        price: priceMin,
-        priceMin: priceMin,
-        priceMax: priceMax,
-        priceVaries,
-        compareAtPrice: compareAtMin,
-        compareAtPriceMin: compareAtMin,
-        compareAtPriceMax: compareAtMax,
-        compareAtPriceVaries: compareAtVaries,
-        discount: 0, // Calculate if needed
-        currency: this.storeCurrency ?? "USD",
-        localizedPricing: {
-          currency: this.storeCurrency ?? "USD",
-          priceFormatted: this.formatPrice(priceMin),
-          priceMinFormatted: this.formatPrice(priceMin),
-          priceMaxFormatted: this.formatPrice(priceMax),
-          compareAtPriceFormatted: this.formatPrice(compareAtMin),
-        },
-        options: product.options.map((option) => ({
-          key: normalizeKey(option.name),
-          data: option.values,
-          name: option.name,
-          position: option.position,
-          values: option.values,
-        })),
-        variantOptionsMap,
-        bodyHtml: product.body_html || null,
-        active: true,
-        productType: product.product_type || null,
-        tags: Array.isArray(product.tags) ? product.tags : [],
-        vendor: product.vendor,
-        featuredImage: product.images?.[0]?.src
-          ? this.normalizeImageUrl(product.images[0].src)
-          : null,
-        isProxyFeaturedImage: false,
-        createdAt: safeParseDate(product.created_at),
-        updatedAt: safeParseDate(product.updated_at),
-        variants: mappedVariants,
-        images: product.images.map((image) => ({
-          id: image.id,
-          productId: image.product_id,
-          alt: null, // ShopifyImage doesn't have alt property
-          position: image.position,
-          src: this.normalizeImageUrl(image.src),
-          width: image.width,
-          height: image.height,
-          mediaType: "image" as const,
-          variantIds: image.variant_ids || [],
-          createdAt: image.created_at,
-          updatedAt: image.updated_at,
-        })),
-        publishedAt: safeParseDate(product.published_at) ?? null,
-        seo: null,
-        metaTags: null,
-        displayScore: undefined,
-        deletedAt: null,
-        storeSlug: this.storeSlug,
-        storeDomain: this.storeDomain,
-        url: `${this.storeDomain}/products/${product.handle}`,
-      };
+    return mapProductsDto(products, {
+      storeDomain: this.storeDomain,
+      storeSlug: this.storeSlug,
+      currency: this.storeCurrency ?? "USD",
+      normalizeImageUrl: (url) => this.normalizeImageUrl(url),
+      formatPrice: (amount) => this.formatPrice(amount),
     });
   }
 
   productDto(product: ShopifySingleProduct): Product {
-    const optionNames = product.options.map((o) => o.name);
-    const variantOptionsMap = buildVariantOptionsMap(
-      optionNames,
-      product.variants
-    );
-
-    return {
-      slug: genProductSlug({
-        handle: product.handle,
-        storeDomain: this.storeDomain,
-      }),
-      handle: product.handle,
-      platformId: product.id.toString(),
-      title: product.title,
-      available: product.available,
-      price: product.price, // Already in correct format (cents as integer)
-      priceMin: product.price_min, // Already in correct format (cents as integer)
-      priceMax: product.price_max, // Already in correct format (cents as integer)
-      priceVaries: product.price_varies,
-      compareAtPrice: product.compare_at_price || 0, // Already in correct format (cents as integer)
-      compareAtPriceMin: product.compare_at_price_min, // Already in correct format (cents as integer)
-      compareAtPriceMax: product.compare_at_price_max, // Already in correct format (cents as integer)
-      compareAtPriceVaries: product.compare_at_price_varies,
-      discount: 0, // Calculate if needed
-      currency: this.storeCurrency ?? "USD",
-      localizedPricing: {
-        currency: this.storeCurrency ?? "USD",
-        priceFormatted: this.formatPrice(product.price),
-        priceMinFormatted: this.formatPrice(product.price_min),
-        priceMaxFormatted: this.formatPrice(product.price_max),
-        compareAtPriceFormatted: this.formatPrice(
-          product.compare_at_price || 0
-        ),
-      },
-      options: product.options.map((option) => ({
-        key: normalizeKey(option.name),
-        data: option.values,
-        name: option.name,
-        position: option.position,
-        values: option.values,
-      })),
-      variantOptionsMap,
-      bodyHtml: product.description || null,
-      active: true,
-      productType: product.type || null,
-      tags: Array.isArray(product.tags)
-        ? product.tags
-        : typeof product.tags === "string"
-          ? [product.tags]
-          : [],
-      vendor: product.vendor,
-      featuredImage: this.normalizeImageUrl(product.featured_image),
-      isProxyFeaturedImage: false,
-      createdAt: safeParseDate(product.created_at),
-      updatedAt: safeParseDate(product.updated_at),
-      variants: product.variants.map((variant) => ({
-        id: variant.id.toString(),
-        platformId: variant.id.toString(),
-        name: undefined, // ShopifySingleProductVariant doesn't have name property
-        title: variant.title,
-        option1: variant.option1,
-        option2: variant.option2,
-        option3: variant.option3,
-        options: [variant.option1, variant.option2, variant.option3].filter(
-          Boolean
-        ) as string[],
-        sku: variant.sku,
-        requiresShipping: variant.requires_shipping,
-        taxable: variant.taxable,
-        featuredImage: variant.featured_image
-          ? {
-              id: variant.featured_image.id,
-              src: variant.featured_image.src,
-              width: variant.featured_image.width,
-              height: variant.featured_image.height,
-              position: variant.featured_image.position,
-              productId: variant.featured_image.product_id,
-              aspectRatio: variant.featured_image.aspect_ratio || 0,
-              variantIds: variant.featured_image.variant_ids,
-              createdAt: variant.featured_image.created_at,
-              updatedAt: variant.featured_image.updated_at,
-              alt: variant.featured_image.alt,
-            }
-          : null,
-        available: variant.available || false,
-        price:
-          typeof variant.price === "string"
-            ? Number.parseFloat(variant.price)
-            : variant.price, // Already in correct format (cents as integer)
-        weightInGrams: variant.grams,
-        compareAtPrice:
-          typeof variant.compare_at_price === "string"
-            ? Number.parseFloat(variant.compare_at_price || "0")
-            : variant.compare_at_price || 0, // Already in correct format (cents as integer)
-        position: variant.position,
-        productId: variant.product_id,
-        createdAt: variant.created_at,
-        updatedAt: variant.updated_at,
-      })),
-      images: Array.isArray(product.images)
-        ? product.images.map((imageSrc, index) => ({
-            id: index + 1,
-            productId: product.id,
-            alt: null,
-            position: index + 1,
-            src: this.normalizeImageUrl(imageSrc),
-            width: 0,
-            height: 0,
-            mediaType: "image" as const,
-            variantIds: [],
-            createdAt: product.created_at,
-            updatedAt: product.updated_at,
-          }))
-        : [],
-      publishedAt: safeParseDate(product.published_at) ?? null,
-      seo: null,
-      metaTags: null,
-      displayScore: undefined,
-      deletedAt: null,
-      storeSlug: this.storeSlug,
+    return mapProductDto(product, {
       storeDomain: this.storeDomain,
-      url: product.url || `${this.storeDomain}/products/${product.handle}`,
-    };
+      storeSlug: this.storeSlug,
+      currency: this.storeCurrency ?? "USD",
+      normalizeImageUrl: (url) => this.normalizeImageUrl(url),
+      formatPrice: (amount) => this.formatPrice(amount),
+    });
   }
 
   collectionsDto(collections: ShopifyCollection[]): Collection[] {
-    return collections.map((collection) => ({
-      id: collection.id.toString(),
-      title: collection.title,
-      handle: collection.handle,
-      description: collection.description,
-      image: collection.image
-        ? {
-            id: collection.image.id,
-            createdAt: collection.image.created_at,
-            src: collection.image.src,
-            alt: collection.image.alt,
-          }
-        : undefined,
-      productsCount: collection.products_count,
-      publishedAt: collection.published_at,
-      updatedAt: collection.updated_at,
-    }));
+    return dtoCollections(collections) ?? [];
   }
 
   /**
@@ -780,218 +503,19 @@ export class ShopClient {
    */
   async getInfo(): Promise<StoreInfo> {
     try {
-      const response = await rateLimitedFetch(this.baseUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const { info, currencyCode } = await getInfoForStore({
+        baseUrl: this.baseUrl,
+        storeDomain: this.storeDomain,
+        validateProductExists: (handle) => this.validateProductExists(handle),
+        validateCollectionExists: (handle) =>
+          this.validateCollectionExists(handle),
+        validateLinksInBatches: (items, validator, batchSize) =>
+          this.validateLinksInBatches(items, validator, batchSize),
+      });
+      if (typeof currencyCode === "string") {
+        this.storeCurrency = currencyCode;
       }
-      const html = await response.text();
-
-      const getMetaTag = (name: string) => {
-        const regex = new RegExp(
-          `<meta[^>]*name=["']${name}["'][^>]*content=["'](.*?)["']`
-        );
-        const match = html.match(regex);
-        return match ? match[1] : null;
-      };
-
-      const getPropertyMetaTag = (property: string) => {
-        const regex = new RegExp(
-          `<meta[^>]*property=["']${property}["'][^>]*content=["'](.*?)["']`
-        );
-        const match = html.match(regex);
-        return match ? match[1] : null;
-      };
-
-      const name =
-        getMetaTag("og:site_name") ?? extractDomainWithoutSuffix(this.baseUrl);
-      const title = getMetaTag("og:title") ?? getMetaTag("twitter:title");
-
-      const description =
-        getMetaTag("description") || getPropertyMetaTag("og:description");
-
-      const shopifyWalletId = getMetaTag("shopify-digital-wallet")?.split(
-        "/"
-      )[1];
-
-      const myShopifySubdomainMatch = html.match(
-        /['"](.*?\.myshopify\.com)['"]/
-      );
-      const myShopifySubdomain = myShopifySubdomainMatch
-        ? myShopifySubdomainMatch[1]
-        : null;
-
-      let logoUrl =
-        getPropertyMetaTag("og:image") ||
-        getPropertyMetaTag("og:image:secure_url");
-      if (!logoUrl) {
-        const logoMatch = html.match(
-          /<img[^>]+src=["']([^"']+\/cdn\/shop\/[^"']+)["']/
-        );
-        const matchedUrl = logoMatch?.[1];
-        logoUrl = matchedUrl ? matchedUrl.replace("http://", "https://") : null;
-      } else {
-        logoUrl = logoUrl.replace("http://", "https://");
-      }
-
-      const socialLinks: Record<string, string> = {};
-      const socialRegex =
-        /<a[^>]+href=["']([^"']*(?:facebook|twitter|instagram|pinterest|youtube|linkedin|tiktok|vimeo)\.com[^"']*)["']/g;
-      for (const match of html.matchAll(socialRegex)) {
-        const str = match[1];
-        if (!str) continue;
-        let href: string = str;
-        try {
-          // Normalize protocol-relative URLs and relative paths
-          if (href.startsWith("//")) {
-            href = `https:${href}`;
-          } else if (href.startsWith("/")) {
-            href = new URL(href, this.baseUrl).toString();
-          }
-
-          const parsed = new URL(href);
-          const domain = parsed.hostname.replace("www.", "").split(".")[0];
-          if (domain) {
-            socialLinks[domain] = parsed.toString();
-          }
-        } catch {
-          // Skip invalid URLs found in markup without failing the entire operation
-          // Continue to next match
-        }
-      }
-
-      const contactLinks = {
-        tel: null as string | null,
-        email: null as string | null,
-        contactPage: null as string | null,
-      };
-
-      // Extract contact details using focused regexes to avoid parser pitfalls
-      for (const match of html.matchAll(/href=["']tel:([^"']+)["']/g)) {
-        contactLinks.tel = match?.[1]?.trim() || null;
-      }
-      for (const match of html.matchAll(/href=["']mailto:([^"']+)["']/g)) {
-        contactLinks.email = match?.[1]?.trim() || null;
-      }
-      for (const match of html.matchAll(
-        /href=["']([^"']*(?:\/contact|\/pages\/contact)[^"']*)["']/g
-      )) {
-        contactLinks.contactPage = match?.[1] || null;
-      }
-
-      const extractedProductLinks =
-        html
-          .match(/href=["']([^"']*\/products\/[^"']+)["']/g)
-          ?.map((match) =>
-            match?.split("href=")[1]?.replace(/['"]/g, "")?.split("/").at(-1)
-          )
-          ?.filter(Boolean) || [];
-
-      const extractedCollectionLinks =
-        html
-          .match(/href=["']([^"']*\/collections\/[^"']+)["']/g)
-          ?.map((match) =>
-            match?.split("href=")[1]?.replace(/['"]/g, "")?.split("/").at(-1)
-          )
-          ?.filter(Boolean) || [];
-
-      // Validate links in batches for better performance
-      const [homePageProductLinks, homePageCollectionLinks] = await Promise.all(
-        [
-          this.validateLinksInBatches(
-            extractedProductLinks.filter((handle): handle is string =>
-              Boolean(handle)
-            ),
-            (handle) => this.validateProductExists(handle)
-          ),
-          this.validateLinksInBatches(
-            extractedCollectionLinks.filter((handle): handle is string =>
-              Boolean(handle)
-            ),
-            (handle) => this.validateCollectionExists(handle)
-          ),
-        ]
-      );
-
-      const jsonLd = html
-        .match(
-          /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/g
-        )
-        ?.map(
-          (match) => match?.split(">")[1]?.replace(/<\/script/g, "") || null
-        );
-      const jsonLdData = jsonLd?.map((json) =>
-        json ? JSON.parse(json) : null
-      );
-
-      const headerLinks =
-        html
-          .match(
-            /<(header|nav|div|section)\b[^>]*\b(?:id|class)=["'][^"']*(?=.*shopify-section)(?=.*\b(header|navigation|nav|menu)\b)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi
-          )
-          ?.flatMap((header) => {
-            const links = header
-              .match(/href=["']([^"']+)["']/g)
-              ?.filter(
-                (link) =>
-                  link.includes("/products/") ||
-                  link.includes("/collections/") ||
-                  link.includes("/pages/")
-              );
-            return (
-              links
-                ?.map((link) => {
-                  const href = link.match(/href=["']([^"']+)["']/)?.[1];
-                  if (
-                    href &&
-                    !href.startsWith("#") &&
-                    !href.startsWith("javascript:")
-                  ) {
-                    try {
-                      const url = new URL(href, this.storeDomain);
-                      return url.pathname.replace(/^\/|\/$/g, "");
-                    } catch {
-                      return href.replace(/^\/|\/$/g, "");
-                    }
-                  }
-                  return null;
-                })
-                .filter((item): item is string => Boolean(item)) ?? []
-            );
-          }) ?? [];
-
-      const slug = generateStoreSlug(this.baseUrl);
-
-      // Detect country information
-      const countryDetection = await detectShopifyCountry(html);
-      if (
-        countryDetection &&
-        typeof (countryDetection as any).currencyCode === "string"
-      ) {
-        this.storeCurrency = (countryDetection as any).currencyCode;
-      }
-
-      return {
-        name: name || slug,
-        domain: sanitizeDomain(this.baseUrl),
-        slug,
-        title: title || null,
-        description: description || null,
-        logoUrl: logoUrl,
-        socialLinks,
-        contactLinks,
-        headerLinks,
-        showcase: {
-          products: unique(homePageProductLinks ?? []),
-          collections: unique(homePageCollectionLinks ?? []),
-        },
-        jsonLdData,
-        techProvider: {
-          name: "shopify",
-          walletId: shopifyWalletId,
-          subDomain: myShopifySubdomain ?? null,
-        },
-        country: countryDetection.country,
-      };
+      return info;
     } catch (error) {
       this.handleFetchError(error, "fetching store info", this.baseUrl);
     }
@@ -1008,172 +532,23 @@ export class ShopClient {
     maxShowcaseCollections?: number;
   }): Promise<StoreTypeBreakdown> {
     try {
-      const info = await this.getInfo();
-
-      // Resolve showcased handles to actual products and classify using body_html only
-      const maxProducts = Math.max(
-        0,
-        Math.min(50, options?.maxShowcaseProducts ?? 10)
-      );
-      // Helper to take a random sample without modifying the original array
-      const takeRandom = <T>(arr: T[], n: number): T[] => {
-        if (n <= 0) return [];
-        if (n >= arr.length) return arr.slice();
-        const a = arr.slice();
-        for (let i = a.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          const ai = a[i]!;
-          const aj = a[j]!;
-          a[i] = aj;
-          a[j] = ai;
-        }
-        return a.slice(0, n);
-      };
-      const productHandles = Array.isArray(info.showcase.products)
-        ? takeRandom(info.showcase.products, maxProducts)
-        : [];
-      const showcasedProducts = await Promise.all(
-        productHandles.map((handle) => this.products.find(handle))
-      );
-      // Build breakdown by classifying each product using body_html only
-      const textNormalized =
-        `${info.title || info.name} ${info.description ?? ""}`.toLowerCase();
-
-      // Regex heuristics for offline/missing API key classification
-      type AudienceKey =
-        | "kid"
-        | "kid_male"
-        | "kid_female"
-        | "adult_male"
-        | "adult_female";
-      const audienceKeywords: Record<AudienceKey, RegExp> = {
-        kid: /(\bkid\b|\bchild\b|\bchildren\b|\btoddler\b|\bboy\b|\bgirl\b)/,
-        kid_male: /\bboys\b|\bboy\b/,
-        kid_female: /\bgirls\b|\bgirl\b/,
-        adult_male: /\bmen\b|\bmale\b|\bman\b|\bmens\b/,
-        adult_female: /\bwomen\b|\bfemale\b|\bwoman\b|\bwomens\b/,
-      };
-      type Vertical =
-        | "clothing"
-        | "beauty"
-        | "accessories"
-        | "home-decor"
-        | "food-and-beverages";
-      const verticalKeywords: Record<Vertical, RegExp> = {
-        clothing:
-          /(dress|shirt|pant|jean|hoodie|tee|t[- ]?shirt|sneaker|apparel|clothing)/,
-        beauty: /(skincare|moisturizer|serum|beauty|cosmetic|makeup)/,
-        accessories:
-          /(bag|belt|watch|wallet|accessor(y|ies)|sunglasses|jewell?ery)/,
-        // Tightened home-decor detection to avoid generic "Home" noise
-        "home-decor":
-          /(sofa|chair|table|candle|lamp|rug|furniture|home[- ]?decor|homeware|housewares|living\s?room|dining\s?table|bed(?:room)?|wall\s?(art|mirror|clock))/,
-        "food-and-beverages":
-          /(snack|food|beverage|coffee|tea|chocolate|gourmet)/,
-      };
-
-      const breakdown: StoreTypeBreakdown = {};
-      const apiKey = options?.apiKey || process.env.OPENROUTER_API_KEY;
-      const isOffline = process.env.OPENROUTER_OFFLINE === "1" || !apiKey;
-
-      const validProducts = showcasedProducts.filter((p): p is Product =>
-        Boolean(
-          p?.bodyHtml && typeof p.bodyHtml === "string" && p.bodyHtml.trim()
-        )
-      );
-
-      for (const p of validProducts) {
-        const productText = String(p.bodyHtml || "").toLowerCase();
-        let audience:
-          | "adult_male"
-          | "adult_female"
-          | "kid_male"
-          | "kid_female"
-          | "generic" = "generic";
-        let vertical:
-          | "clothing"
-          | "beauty"
-          | "accessories"
-          | "home-decor"
-          | "food-and-beverages" = "accessories";
-        let category: string | null = null;
-
-        if (!isOffline) {
-          try {
-            // Use only body_html for classification via LLM
-            const { classifyProduct } = await import("./utils/enrich");
-            const cls = await classifyProduct(String(p.bodyHtml || ""), {
-              apiKey,
-              model: options?.model,
-            });
-            audience = cls.audience;
-            vertical = cls.vertical;
-            category = cls.category ?? null;
-          } catch {
-            // If any issue occurs, fall back to offline heuristics for this product
-          }
-        }
-
-        if (isOffline) {
-          // Audience detection (kids vs generic)
-          if (audienceKeywords.kid_male.test(productText)) {
-            audience = "kid_male";
-          } else if (audienceKeywords.kid_female.test(productText)) {
-            audience = "kid_female";
-          } else {
-            audience = "generic";
-          }
-          // Vertical detection for offline mode
-          const vEntry = Object.entries(verticalKeywords).find(([, rx]) =>
-            rx.test(productText)
-          );
-          vertical = vEntry ? (vEntry[0] as typeof vertical) : "accessories";
-          category = "general";
-        } else {
-          // Audience detection (adult vs generic)
-          if (audienceKeywords.adult_male.test(productText)) {
-            audience = "adult_male";
-          } else if (audienceKeywords.adult_female.test(productText)) {
-            audience = "adult_female";
-          } else {
-            audience = "generic";
-          }
-        }
-
-        breakdown[audience] = breakdown[audience] || {};
-        const audienceBucket = breakdown[audience]!;
-        if (!audienceBucket[vertical]) {
-          audienceBucket[vertical] = [];
-        }
-        const arr = audienceBucket[vertical]!;
-        const cat = (category ?? "").trim() || "general";
-        if (!arr.includes(cat)) arr.push(cat);
-      }
-
-      // Fallback when no valid products classified
-      if (Object.keys(breakdown).length === 0) {
-        breakdown.generic = { accessories: ["general"] };
-      }
-
-      // Optionally prune using store-level signals for consistency
-      // Build a normalized text with store title/description only (no enriched content)
-      const normalized = textNormalized;
-      try {
-        // Lazy import to avoid circular deps at module load time
-        const { pruneBreakdownForSignals } = await import("./utils/enrich");
-        return pruneBreakdownForSignals(
-          breakdown as any,
-          normalized
-        ) as StoreTypeBreakdown;
-      } catch {
-        return breakdown;
-      }
+      const breakdown = await determineStoreTypeForStore({
+        baseUrl: this.baseUrl,
+        getInfo: () => this.getInfo(),
+        findProduct: (handle: string) => this.products.find(handle),
+        apiKey: options?.apiKey,
+        model: options?.model,
+        maxShowcaseProducts: options?.maxShowcaseProducts,
+        maxShowcaseCollections: options?.maxShowcaseCollections,
+      });
+      return breakdown;
     } catch (error: unknown) {
       throw this.handleFetchError(error, "determineStoreType", this.baseUrl);
     }
   }
 }
 
+export { classifyProduct, generateSEOContent } from "./ai/enrich";
 export type { CheckoutOperations } from "./checkout";
 export type { CollectionOperations } from "./collections";
 // Export operation interfaces
@@ -1181,53 +556,8 @@ export type { ProductOperations } from "./products";
 export type { StoreInfo, StoreOperations } from "./store";
 // Export all types for external use
 // Classification utility
-export type {
-  Address,
-  CatalogCategory,
-  Collection,
-  ContactUrls,
-  // Country detection types
-  CountryDetectionResult,
-  CountryScore,
-  CountryScores,
-  Coupon,
-  Demographics,
-  MetaTag,
-  // Core product and collection types
-  Product,
-  ProductClassification,
-  ProductImage,
-  ProductOption,
-  ProductPricing,
-  ProductVariant,
-  ProductVariantImage,
-  SEOContent,
-  ShopifyApiProduct,
-  ShopifyBaseProduct,
-  ShopifyBaseVariant,
-  ShopifyBasicInfo,
-  ShopifyCollection,
-  ShopifyFeaturedMedia,
-  ShopifyFeaturesData,
-  ShopifyImage,
-  ShopifyImageDimensions,
-  ShopifyMedia,
-  ShopifyOption,
-  ShopifyPredictiveProductSearch,
-  // Shopify API types
-  ShopifyProduct,
-  ShopifyProductVariant,
-  ShopifySingleProduct,
-  ShopifySingleProductVariant,
-  ShopifyTimestamps,
-  ShopifyVariantImage,
-  // Store and catalog types
-  StoreCatalog,
-  StoreTypeBreakdown,
-  ValidStoreCatalog,
-} from "./types";
+export type * from "./types";
 export { detectShopifyCountry } from "./utils/detect-country";
-export { classifyProduct, generateSEOContent } from "./utils/enrich";
 // Export utility functions
 export {
   calculateDiscount,

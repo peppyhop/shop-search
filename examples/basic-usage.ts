@@ -6,7 +6,6 @@
  */
 import { configureRateLimit, ShopClient } from "../src/index";
 
-
 async function basicUsageExample() {
   // Optional: enable a conservative global rate limiter to avoid 429s
   configureRateLimit({

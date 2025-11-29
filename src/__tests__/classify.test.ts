@@ -1,4 +1,4 @@
-import { classifyProduct } from "../utils/enrich";
+import { classifyProduct } from "../ai/enrich";
 
 describe("classifyProduct", () => {
   beforeEach(() => {

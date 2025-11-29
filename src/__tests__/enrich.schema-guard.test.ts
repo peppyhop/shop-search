@@ -1,4 +1,4 @@
-import * as enrich from "../utils/enrich";
+import * as enrich from "../ai/enrich";
 
 describe("mergeWithLLM runtime schema guard", () => {
   const domain = "https://example.com";
