@@ -1,3 +1,5 @@
+## [3.6.1](https://github.com/peppyhop/shop-search/compare/v3.6.0...v3.6.1) (2025-11-29)
+
 ## [3.6.0](https://github.com/peppyhop/shop-search/compare/v3.5.0...v3.6.0) (2025-11-28)
 
 ### Features
