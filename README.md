@@ -387,6 +387,23 @@ const showcasedCollections = await shop.collections.showcased();
 
 **Returns:** `Collection[]` - Array of featured collections
 
+#### `collections.paginated(options)`
+
+Fetches collections with manual pagination control.
+
+```typescript
+const collectionsPage = await shop.collections.paginated({
+  page: 1,
+  limit: 10,
+});
+```
+
+**Parameters:**
+- `page` (number, optional): Page number (default: 1)
+- `limit` (number, optional): Collections per page (default: 10, max: 250)
+
+**Returns:** `Collection[]` - Array of collections for the specified page
+
 ### Collection Products
 
 #### `collections.products.all(handle)`

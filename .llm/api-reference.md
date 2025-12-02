@@ -239,6 +239,24 @@ Fetches collections that are showcased/featured on the store's homepage.
 const featuredCollections = await shop.collections.showcased();
 ```
 
+### `paginated(options?: PaginationOptions): Promise<Collection[] | null>`
+
+Fetches collections with pagination.
+
+**Parameters:**
+- `options.page?: number` - Page number (default: 1)
+- `options.limit?: number` - Items per page (default: 10, max: 250)
+
+**Returns:** Array of collections for the specified page or null on error
+
+**Example:**
+```typescript
+const collectionsPage = await shop.collections.paginated({
+  page: 1,
+  limit: 10,
+});
+```
+
 ### Collection Products
 
 #### `products.all(collectionHandle: string): Promise<Product[] | null>`
