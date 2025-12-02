@@ -19,6 +19,20 @@ export interface CollectionOperations {
   all(): Promise<Collection[]>;
 
   /**
+   * Fetches collections with pagination support.
+   *
+   * @param options - Pagination options
+   * @param options.page - Page number (default: 1)
+   * @param options.limit - Number of collections per page (default: 10, max: 250)
+   *
+   * @returns {Promise<Collection[] | null>} Array of collections for the page or null if error occurs
+   */
+  paginated(options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<Collection[] | null>;
+
+  /**
    * Finds a specific collection by its handle.
    */
   find(collectionHandle: string): Promise<Collection | null>;
@@ -104,6 +118,40 @@ export function createCollectionOperations(
   }
 
   return {
+    /**
+     * Fetches collections with pagination support.
+     *
+     * @param options - Pagination options
+     * @param options.page - Page number (default: 1)
+     * @param options.limit - Number of collections per page (default: 10, max: 250)
+     *
+     * @returns {Promise<Collection[] | null>} Collections for the requested page, or null on error
+     */
+    paginated: async (options?: {
+      page?: number;
+      limit?: number;
+    }): Promise<Collection[] | null> => {
+      const page = options?.page ?? 1;
+      const limit = options?.limit ?? 10;
+
+      if (page < 1 || limit < 1 || limit > 250) {
+        throw new Error(
+          "Invalid pagination parameters: page must be >= 1, limit must be between 1 and 250"
+        );
+      }
+
+      try {
+        const collections = await fetchCollections(page, limit);
+        return collections ?? null;
+      } catch (error) {
+        console.error(
+          "Failed to fetch paginated collections:",
+          storeDomain,
+          error
+        );
+        return null;
+      }
+    },
     /**
      * Fetches all collections from the store across all pages.
      *
