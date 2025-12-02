@@ -1,3 +1,9 @@
+## [3.7.0](https://github.com/peppyhop/shop-search/compare/v3.6.1...v3.7.0) (2025-12-02)
+
+### Features
+
+* **collections:** add paginated method to fetch collections with pagination support ([#14](https://github.com/peppyhop/shop-search/issues/14)) ([821a3eb](https://github.com/peppyhop/shop-search/commit/821a3eb10c086928752d448867b3a8065eb6a1cf))
+
 ## [3.6.1](https://github.com/peppyhop/shop-search/compare/v3.6.0...v3.6.1) (2025-11-29)
 
 ## [3.6.0](https://github.com/peppyhop/shop-search/compare/v3.5.0...v3.6.0) (2025-11-28)
