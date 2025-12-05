@@ -1,6 +1,6 @@
 {
-  "name": "shop-search",
-  "version": "3.8.1",
+  "name": "shop-client",
+  "version": "3.8.2",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -65,7 +65,7 @@
     "typescript",
     "nodejs",
     "product-catalog",
-    "shop-search",
+    "shop-client",
     "shopify-api",
     "product-scraper",
     "ecommerce-tools"
@@ -75,11 +75,11 @@
   "description": "A powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/peppyhop/shop-search.git"
+    "url": "git+https://github.com/peppyhop/shop-client.git"
   },
-  "homepage": "https://github.com/peppyhop/shop-search#readme",
+  "homepage": "https://github.com/peppyhop/shop-client#readme",
   "bugs": {
-    "url": "https://github.com/peppyhop/shop-search/issues"
+    "url": "https://github.com/peppyhop/shop-client/issues"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.7",
