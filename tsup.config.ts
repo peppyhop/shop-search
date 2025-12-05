@@ -9,8 +9,13 @@ export default defineConfig({
     "src/store.ts",
     "src/utils/rate-limit.ts",
   ],
-  format: ["cjs", "esm"], // Support CommonJS and ESM
-  dts: true, // Generate TypeScript declaration files
-  sourcemap: true,
-  clean: true, // Clean dist folder before build
+  format: ["esm"],
+  dts: true,
+  sourcemap: false,
+  minify: true,
+  treeshake: true,
+  target: "node18",
+  external: ["remeda", "tldts", "turndown", "turndown-plugin-gfm"],
+  splitting: true,
+  clean: true,
 });

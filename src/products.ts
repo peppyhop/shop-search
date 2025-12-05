@@ -1,9 +1,5 @@
 import { filter, isNonNullish } from "remeda";
-import {
-  classifyProduct,
-  enrichProduct,
-  generateSEOContent as generateSEOContentLLM,
-} from "./ai/enrich";
+// Heavy AI enrich utilities are lazy-loaded where needed to keep base bundle light
 import type { StoreInfo } from "./store";
 import type {
   CurrencyCode,
@@ -372,6 +368,7 @@ export function createProductOperations(
 
       // Use the normalized handle from the found product
       const handle = baseProduct.handle;
+      const { enrichProduct } = await import("./ai/enrich");
       const enriched = await enrichProduct(storeDomain, handle, {
         apiKey,
         useGfm: options?.useGfm,
@@ -427,6 +424,7 @@ export function createProductOperations(
         // keep as-is if not JSON
       }
 
+      const { classifyProduct } = await import("./ai/enrich");
       const classification = await classifyProduct(productContent, {
         apiKey,
         model: options?.model,
@@ -459,6 +457,9 @@ export function createProductOperations(
         tags: baseProduct.tags,
       };
 
+      const { generateSEOContent: generateSEOContentLLM } = await import(
+        "./ai/enrich"
+      );
       const seo = await generateSEOContentLLM(payload, {
         apiKey,
         model: options?.model,
