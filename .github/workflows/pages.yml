@@ -26,14 +26,8 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build TypeDoc
-        run: bun run docs:build
-
-      - name: Ensure index.md exists for Pages
-        run: |
-          if [ ! -f docs/index.md ] && [ -f docs/README.md ]; then
-            cp docs/README.md docs/index.md;
-          fi
+      - name: Build TypeDoc (HTML)
+        run: bunx typedoc --options typedoc.pages.json
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

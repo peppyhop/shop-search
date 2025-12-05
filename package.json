@@ -46,6 +46,7 @@
     "test": "bun test",
     "test:ci": "bun test --coverage",
     "docs:build": "typedoc",
+    "docs:site": "typedoc --options typedoc.pages.json",
     "semantic-release": "semantic-release",
     "format": "biome format --write --no-errors-on-unmatched",
     "lint": "biome lint --diagnostic-level=error --no-errors-on-unmatched . && tsc --noEmit -p tsconfig.json",
