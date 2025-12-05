@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The `shop-search` library is a TypeScript-based SDK designed to interact with Shopify stores through their public APIs. It provides a clean, type-safe interface for accessing store information, products, collections, and checkout functionality.
+The `shop-client` library is a TypeScript-based SDK designed to interact with Shopify stores through their public APIs. It provides a clean, type-safe interface for accessing store information, products, collections, and checkout functionality.
 
 ## Core Design Principles
 
@@ -124,7 +124,7 @@ Resolution order: class → host → default.
 Example:
 
 ```typescript
-import { configureRateLimit } from 'shop-search';
+import { configureRateLimit } from 'shop-client';
 
 configureRateLimit({
   enabled: true,
@@ -137,7 +137,7 @@ configureRateLimit({
 Tree-Shaking & Subpath Exports
 - The rate limiter’s timer starts lazily on first use; there are no import-time side effects.
 - The package declares `sideEffects: false` and provides subpath exports for deep imports:
-  - `shop-search/products`, `shop-search/collections`, `shop-search/checkout`, `shop-search/store`, `shop-search/rate-limit`
+  - `shop-client/products`, `shop-client/collections`, `shop-client/checkout`, `shop-client/store`, `shop-client/rate-limit`
 - Prefer deep imports for smaller bundles and faster builds.
 
 Date handling policy:

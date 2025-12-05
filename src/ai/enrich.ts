@@ -361,7 +361,7 @@ async function callOpenRouter(
     Authorization: `Bearer ${apiKey}`,
   };
   const referer = process.env.OPENROUTER_SITE_URL || process.env.SITE_URL;
-  const title = process.env.OPENROUTER_APP_TITLE || "Shop Search";
+  const title = process.env.OPENROUTER_APP_TITLE || "Shop Client";
   if (referer) headers["HTTP-Referer"] = referer;
   if (title) headers["X-Title"] = title;
 

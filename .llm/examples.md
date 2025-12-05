@@ -1,15 +1,15 @@
-# Shop Search - Code Examples
+# Shop Client - Code Examples
 
 ## Overview
 
-This document provides comprehensive code examples for the `shop-search` library, designed to help LLMs understand common usage patterns and generate appropriate code.
+This document provides comprehensive code examples for the `shop-client` library, designed to help LLMs understand common usage patterns and generate appropriate code.
 
 ## Basic Examples
 
 ### 1. Simple Product Fetching
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 async function fetchAllProducts() {
   const shop = new ShopClient('anuki.in');
@@ -42,7 +42,7 @@ fetchAllProducts();
 ### 2. Store Information Retrieval
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 async function getStoreDetails() {
   const shop = new ShopClient('anuki.in');
@@ -79,7 +79,7 @@ getStoreDetails();
 ### 3. Product Search and Filtering
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 async function searchProducts(searchTerm: string) {
   const shop = new ShopClient('anuki.in');

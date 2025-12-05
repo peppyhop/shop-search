@@ -1,8 +1,8 @@
-# Shop Search - Technical Context
+# Shop Client - Technical Context
 
 ## Architecture Overview
 
-The `shop-search` library is built with a modular, type-safe architecture designed for extracting and transforming Shopify store data. The library follows clean architecture principles with clear separation of concerns.
+The `shop-client` library is built with a modular, type-safe architecture designed for extracting and transforming Shopify store data. The library follows clean architecture principles with clear separation of concerns.
 
 ### Core Design Principles
 
@@ -402,4 +402,4 @@ dist/
 - **Middleware Support**: Request/response interception
 - **Event Hooks**: Lifecycle event handling
 
-This technical context provides the foundation for understanding and extending the shop-search library codebase.
+This technical context provides the foundation for understanding and extending the shop-client library codebase.

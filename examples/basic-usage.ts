@@ -1,7 +1,7 @@
 /**
- * Basic Usage Example - Shop Search Library
+ * Basic Usage Example - Shop Client Library
  *
- * This example demonstrates the basic functionality of the shop-search library
+ * This example demonstrates the basic functionality of the shop-client library
  * using the anuki.in Shopify store.
  */
 import { configureRateLimit, ShopClient } from "../src/index";

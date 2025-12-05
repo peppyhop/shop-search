@@ -1,10 +1,10 @@
 /**
- * @fileoverview Type definitions for the shop-search package.
+ * @fileoverview Type definitions for the shop-client package.
  *
- * This file contains all TypeScript type definitions used throughout the shop-search library,
+ * This file contains all TypeScript type definitions used throughout the shop-client library,
  * including Shopify API response types, normalized product/collection types, and utility types.
  *
- * @author shop-search
+ * @author shop-client
  */
 
 // Simplified version of RequireAtLeastOne utility type

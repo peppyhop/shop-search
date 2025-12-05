@@ -133,6 +133,21 @@ Notes:
 
 ### Migration: Barrel → Subpath Imports
 
+#### Package Rename: `shop-search` → `shop-client` (v3.8.2)
+- Install: `npm i shop-client` (replaces `shop-search`)
+- Update imports to `shop-client` (API unchanged)
+
+TypeScript:
+```ts
+// Before (pre-rename: shop-search)
+import { Store } from 'shop-search';
+const store = new Store("your-store.myshopify.com");
+
+// After (post-rename: shop-client v3.8.2+)
+import { ShopClient } from 'shop-client';
+const client = new ShopClient("your-store.myshopify.com");
+```
+
 You can keep using the root entry (`shop-client`), but for smaller bundles switch to deep imports. The API remains the same—only the import paths change.
 
 Examples:

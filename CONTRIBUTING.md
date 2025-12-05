@@ -1,6 +1,6 @@
 # Contributing to Shop Search
 
-Thank you for your interest in contributing to the `shop-search` library! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the `shop-client` library! This document provides guidelines and information for contributors.
 
 ## Table of Contents
 
@@ -26,8 +26,8 @@ Thank you for your interest in contributing to the `shop-search` library! This d
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/your-username/shop-search.git
-   cd shop-search
+   git clone https://github.com/your-username/shop-client.git
+   cd shop-client
    ```
 
 2. **Install Dependencies**
@@ -53,7 +53,7 @@ Thank you for your interest in contributing to the `shop-search` library! This d
 ### Project Structure
 
 ```
-shop-search/
+shop-client/
 ├── src/
 │   ├── index.ts           # Main entry point
 │   ├── client.ts          # ShopClient class
@@ -482,4 +482,4 @@ Please note that this project is released with a Contributor Code of Conduct. By
 - Help others learn and grow
 - Maintain a professional environment
 
-Thank you for contributing to `shop-search`! Your efforts help make e-commerce development easier for everyone.
+Thank you for contributing to `shop-client`! Your efforts help make e-commerce development easier for everyone.

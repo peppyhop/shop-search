@@ -1,8 +1,8 @@
-# Shop Search - LLM Context File
+# Shop Client - LLM Context File
 
 ## Repository Overview
 
-**shop-search** is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. This library enables developers to build e-commerce applications, product catalogs, price comparison tools, and automated store analysis systems.
+**shop-client** is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. This library enables developers to build e-commerce applications, product catalogs, price comparison tools, and automated store analysis systems.
 
 **Version:** 2.2.0
 **License:** MIT
@@ -157,7 +157,7 @@ interface StoreInfo {
 
 ### Basic Usage
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 const shop = new ShopClient('store-domain.com');
 const products = await shop.products.all();

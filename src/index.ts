@@ -26,7 +26,7 @@ import { rateLimitedFetch } from "./utils/rate-limit";
  *
  * @example
  * ```typescript
- * import { ShopClient } from 'shop-search';
+ * import { ShopClient } from 'shop-client';
  *
  * const shop = new ShopClient('https://exampleshop.com');
  *

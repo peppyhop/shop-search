@@ -1,23 +1,23 @@
-# Shop Search - API Reference
+# Shop Client - API Reference
 
 ## Overview
 
-This document provides a comprehensive API reference for the `shop-search` library, designed for LLM understanding and code generation assistance.
+This document provides a comprehensive API reference for the `shop-client` library, designed for LLM understanding and code generation assistance.
 
 ## Installation
 
 ```bash
-npm install shop-search
+npm install shop-client
 # or
-yarn add shop-search
+yarn add shop-client
 # or
-pnpm add shop-search
+pnpm add shop-client
 ```
 
 ## Basic Usage
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 const shop = new ShopClient('your-store-domain.com');
 ```
@@ -543,7 +543,7 @@ Detects the country of a Shopify store based on various signals.
 
 **Example:**
 ```typescript
-import { detectShopifyCountry } from 'shop-search';
+import { detectShopifyCountry } from 'shop-client';
 
 const result = await detectShopifyCountry('anuki.in');
 console.log(`Country: ${result.country}, Confidence: ${result.confidence}`);
@@ -597,7 +597,7 @@ Utility functions are exported to support common normalization and parsing tasks
 ### sanitizeDomain(input, opts?)
 
 ```typescript
-import { sanitizeDomain } from 'shop-search';
+import { sanitizeDomain } from 'shop-client';
 sanitizeDomain('https://WWW.Example.com/path?x=1#top'); // 'example.com'
 sanitizeDomain('www.example.com', { stripWWW: false }); // 'www.example.com'
 // sanitizeDomain('example'); // throws (invalid: missing public suffix)
@@ -614,7 +614,7 @@ Throws for invalid inputs:
 ### safeParseDate(input?)
 
 ```typescript
-import { safeParseDate } from 'shop-search';
+import { safeParseDate } from 'shop-client';
 safeParseDate('2024-10-31T12:34:56Z'); // Date
 safeParseDate(''); // undefined
 ```
@@ -624,7 +624,7 @@ Parses date strings safely, returning `undefined` for falsy or invalid inputs. U
 ### Variant helpers
 
 ```typescript
-import { ProductOperations } from 'shop-search';
+import { ProductOperations } from 'shop-client';
 // helper usage is internal in DTOs; keys are normalized
 // map format: 'color#blue##size#xl' → '123456'
 ```

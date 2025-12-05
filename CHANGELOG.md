@@ -1,3 +1,20 @@
+<!-- Repository Rename Notice -->
+> As of `v3.8.2`, the package and repository were renamed from `shop-search` to `shop-client`. Links prior to `v3.8.2` reference `peppyhop/shop-search`; links from `v3.8.2` onward reference `peppyhop/shop-client`.
+
+## [3.8.2](https://github.com/peppyhop/shop-client/compare/v3.8.1...v3.8.2) (2025-12-05)
+
+### Chores
+
+- Rename package and repository: `shop-search` → `shop-client`
+- Update NPM package name, import paths, documentation, and examples
+- Backward compatibility: API unchanged; primary change is import path
+
+### Migration
+
+- Install: `npm i shop-client` (replaces `shop-search`)
+- Update imports: `import { ShopClient } from 'shop-client'`
+
+
 ## [3.8.1](https://github.com/peppyhop/shop-search/compare/v3.8.0...v3.8.1) (2025-12-05)
 
 ### Bug Fixes
@@ -164,29 +181,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### **Class Name Change**
 ```typescript
-// v1.x
+// Before (pre-rename: shop-search)
 import { Store } from 'shop-search';
-const store = new Store("your-store.myshopify.com");
+const store = new Store "your-store.myshopify.com";
 
-// v2.x
-import { ShopClient } from 'shop-search';
-const client = new ShopClient("your-store.myshopify.com");
+// After (post-rename: shop-client v3.8.2+)
+import { ShopClient } from 'shop-client';
+const client = new ShopClient "your-store.myshopify.com";
 ```
 
 #### **Product Operations**
 ```typescript
-// v1.x
+// Before (pre-rename)
 const products = await store.products.all();
 const product = await store.products.find("handle");
 
-// v2.x - Same methods, enhanced functionality
+// After (post-rename) - Same methods, enhanced functionality
 const products = await client.products.all();
 const product = await client.products.find("handle");
 ```
 
 #### **New Store Information**
 ```typescript
-// v2.x - New feature
+// Post-rename (v3.8.2+) - New feature
 const storeInfo = await client.getInfo();
 console.log(storeInfo.country); // Detected country
 console.log(storeInfo.name);    // Store name
@@ -195,7 +212,7 @@ console.log(storeInfo.currency); // Store currency
 
 #### **New Collection Operations**
 ```typescript
-// v2.x - New feature
+// Post-rename (v3.8.2+) - New feature
 const collections = await client.collections.all();
 const collection = await client.collections.find("collection-handle");
 const products = await client.collections.products("collection-handle");
@@ -203,7 +220,7 @@ const products = await client.collections.products("collection-handle");
 
 #### **New Checkout Operations**
 ```typescript
-// v2.x - New feature
+// Post-rename (v3.8.2+) - New feature
 const checkoutUrl = await client.checkout.create([
   { variantId: "123", quantity: 1 }
 ]);
@@ -224,7 +241,7 @@ const checkoutUrl = await client.checkout.create([
 - Basic product data normalization
 - Simple TypeScript type definitions
 
-### API Structure (v1.x)
+### API Structure (pre-rename: shop-search)
 ```typescript
 class Store {
   products: {

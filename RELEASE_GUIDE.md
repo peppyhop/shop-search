@@ -1,6 +1,6 @@
 # Release Guide
 
-This document explains the automated versioning and publishing setup for the `shop-search` library.
+This document explains the automated versioning and publishing setup for the `shop-client` library.
 
 ## 🚀 Automated Release Process
 
@@ -118,7 +118,7 @@ Workflow configuration highlights:
 ## 🔍 Monitoring Releases
 
 - **GitHub Actions**: Check workflow runs in the Actions tab
-- **NPM**: Verify publication at https://www.npmjs.com/package/shop-search
+- **NPM**: Verify publication at https://www.npmjs.com/package/shop-client
 - **GitHub Releases**: View releases in the repository's Releases section
 
 ## 🛠️ Manual Release (Emergency)
@@ -173,7 +173,7 @@ npx semantic-release --dry-run
 All releases are automatically documented in:
 - [CHANGELOG.md](./CHANGELOG.md)
 - [GitHub Releases](../../releases)
-- [NPM Package History](https://www.npmjs.com/package/shop-search?activeTab=versions)
+- [NPM Package History](https://www.npmjs.com/package/shop-client?activeTab=versions)
 
 ## ✅ Pre-release Docs Checklist
 

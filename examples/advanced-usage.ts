@@ -13,7 +13,7 @@ async function advancedUsageExample() {
   const shop = new ShopClient("https://anuki.in");
 
   try {
-    console.log("🚀 Advanced Shop Search Library Example");
+    console.log("🚀 Advanced Shop Client Library Example");
     console.log("==========================================\n");
 
     // 1. Comprehensive Store Analysis
