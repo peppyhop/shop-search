@@ -60,9 +60,14 @@ export function sanitizeDomain(
   if (typeof input !== "string") {
     throw new Error("sanitizeDomain: input must be a string");
   }
-  const raw = input.trim();
+  let raw = input.trim();
   if (!raw) {
     throw new Error("sanitizeDomain: input cannot be empty");
+  }
+  // Only add protocol if it's missing and not protocol-relative
+  const hasProtocol = /^[a-z]+:\/\//i.test(raw);
+  if (!hasProtocol && !raw.startsWith("//")) {
+    raw = `https://${raw}`;
   }
 
   const stripWWW = opts?.stripWWW ?? true;
@@ -77,22 +82,39 @@ export function sanitizeDomain(
       url = new URL(`https://${raw}`);
     }
     let hostname = url.hostname.toLowerCase();
+    const hadWWW = /^www\./i.test(url.hostname);
     if (stripWWW) hostname = hostname.replace(/^www\./, "");
-    const parsed = parse(hostname);
-    // If the caller explicitly wants to keep www, preserve it
-    if (!stripWWW && /^www\./.test(url.hostname)) {
-      return hostname;
+    if (!hostname.includes(".")) {
+      throw new Error("sanitizeDomain: invalid domain (missing suffix)");
     }
-    return (parsed.domain ?? hostname) || hostname;
+    const parsed = parse(hostname);
+    if (!parsed.publicSuffix || parsed.isIcann === false) {
+      // Require a valid public suffix (e.g., TLD); reject bare hostnames
+      throw new Error("sanitizeDomain: invalid domain (missing suffix)");
+    }
+    if (!stripWWW && hadWWW) {
+      return `www.${parsed.domain || hostname}`;
+    }
+    return parsed.domain || hostname;
   } catch {
     // Fallback: attempt to sanitize without URL parsing
     let hostname = raw.toLowerCase();
     hostname = hostname.replace(/^[a-z]+:\/\//, ""); // remove protocol if present
     hostname = hostname.replace(/^\/\//, ""); // remove protocol-relative
     hostname = hostname.replace(/[/:#?].*$/, ""); // remove path/query/fragment/port
+    const hadWWW = /^www\./i.test(hostname);
     if (stripWWW) hostname = hostname.replace(/^www\./, "");
+    if (!hostname.includes(".")) {
+      throw new Error("sanitizeDomain: invalid domain (missing suffix)");
+    }
     const parsed = parse(hostname);
-    return (parsed.domain ?? hostname) || hostname;
+    if (!parsed.publicSuffix || parsed.isIcann === false) {
+      throw new Error("sanitizeDomain: invalid domain (missing suffix)");
+    }
+    if (!stripWWW && hadWWW) {
+      return `www.${parsed.domain || hostname}`;
+    }
+    return parsed.domain || hostname;
   }
 }
 

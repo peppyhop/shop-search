@@ -505,6 +505,13 @@ sanitizeDomain('https://www.example.com');            // "example.com"
 sanitizeDomain('www.example.com', { stripWWW: false }); // "www.example.com"
 sanitizeDomain('http://example.com/path');            // "example.com"
 
+// Errors on invalid input (e.g., bare hostname without suffix)
+try {
+  sanitizeDomain('example'); // throws
+} catch (e) {
+  console.error('Invalid domain');
+}
+
 // Safely parse dates (avoids Invalid Date)
 safeParseDate('2024-10-31T12:34:56Z');  // Date
 safeParseDate('');                      // undefined
@@ -513,6 +520,7 @@ safeParseDate('not-a-date');            // undefined
 
 Notes:
 - `sanitizeDomain` trims protocols, paths, and optional `www.` depending on `stripWWW`.
+- Throws for invalid inputs: empty strings or hostnames missing a public suffix (e.g., `example`).
 - `safeParseDate` returns `undefined` for invalid inputs; product `publishedAt` may be `null` when unavailable.
 
 #### Release and Publishing
