@@ -1,3 +1,9 @@
+## [3.8.1](https://github.com/peppyhop/shop-search/compare/v3.8.0...v3.8.1) (2025-12-05)
+
+### Bug Fixes
+
+* **utils:** validate domain suffixes in sanitizeDomain ([#16](https://github.com/peppyhop/shop-search/issues/16)) ([1b2e2e8](https://github.com/peppyhop/shop-search/commit/1b2e2e84d38b93c75cff6ba1a0994e9d5c09babd))
+
 ## [3.8.0](https://github.com/peppyhop/shop-search/compare/v3.7.0...v3.8.0) (2025-12-02)
 
 ### Features
