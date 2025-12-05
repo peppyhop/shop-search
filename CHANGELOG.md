@@ -1,3 +1,9 @@
+## [3.9.0](https://github.com/peppyhop/shop-client/compare/v3.8.2...v3.9.0) (2025-12-05)
+
+### Features
+
+* add configurable caching for store info and API docs deployment ([#19](https://github.com/peppyhop/shop-client/issues/19)) ([9c6cb2a](https://github.com/peppyhop/shop-client/commit/9c6cb2aac9c9c0948c2bf550222c9318f5cb302b))
+
 <!-- Repository Rename Notice -->
 > As of `v3.8.2`, the package and repository were renamed from `shop-search` to `shop-client`. Links prior to `v3.8.2` reference `peppyhop/shop-search`; links from `v3.8.2` onward reference `peppyhop/shop-client`.
 
