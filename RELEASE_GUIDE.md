@@ -131,6 +131,38 @@ npx semantic-release --dry-run
 
 Publishing to npm requires the GitHub Actions workflow with OIDC. Manual local publishes should not be used; rely on Trusted Publishing via CI.
 
+## 🧩 Manual Backfill Release (Tag/Notes Only)
+
+Use this when an npm version is already published and you need to align GitHub with a matching tag and release notes (no CI publish).
+
+### When to Use
+- You manually published or retagged a version on npm.
+- Semantic Release did not run (e.g., rename, provenance setup, or non-branch event).
+
+### Steps
+1. Ensure `CHANGELOG.md` has an entry for the version.
+2. Create the tag locally with the `v` prefix and push it:
+   ```bash
+   git tag -a vX.Y.Z -m "release: vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+3. Create the GitHub Release using the tag and notes:
+   ```bash
+   gh release create vX.Y.Z \
+     --title "vX.Y.Z" \
+     --notes "See CHANGELOG for details."
+   ```
+4. (Optional) Attach build artifacts for consumers who prefer direct downloads:
+   ```bash
+   bun run build
+   tar -czf dist-vX.Y.Z.tgz dist/
+   gh release upload vX.Y.Z dist-vX.Y.Z.tgz --clobber
+   ```
+
+### Important
+- This does not publish to npm; it only aligns Git tags and GitHub Releases.
+- Keep using branch pushes (`main`, `beta`) to trigger automated releases via CI.
+
 ## 📋 Troubleshooting
 
 ### Common Issues
