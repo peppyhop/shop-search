@@ -87,6 +87,18 @@ export function createCollectionOperations(
   findCollection: (handle: string) => Promise<Collection | null>
 ): CollectionOperations {
   // Use shared formatter from utils
+  const cacheExpiryMs = 5 * 60 * 1000; // 5 minutes
+  const findCache = new Map<string, { ts: number; value: Collection | null }>();
+  const getCached = (key: string): Collection | null | undefined => {
+    const entry = findCache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.ts < cacheExpiryMs) return entry.value;
+    findCache.delete(key);
+    return undefined;
+  };
+  const setCached = (key: string, value: Collection | null) => {
+    findCache.set(key, { ts: Date.now(), value });
+  };
 
   function applyCurrencyOverride(
     product: Product,
@@ -249,9 +261,17 @@ export function createCollectionOperations(
         throw new Error("Collection handle is too long");
       }
 
+      // Return cached value if present
+      const cached = getCached(sanitizedHandle);
+      if (typeof cached !== "undefined") {
+        return cached;
+      }
+
       try {
         const url = `${baseUrl}collections/${encodeURIComponent(sanitizedHandle)}.json`;
-        const response = await rateLimitedFetch(url);
+        const response = await rateLimitedFetch(url, {
+          rateLimitClass: "collections:single",
+        });
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -293,7 +313,13 @@ export function createCollectionOperations(
             image: collectionImage,
           },
         ]);
-        return collectionData[0] || null;
+        const coll = collectionData[0] || null;
+        // Cache under both original sanitized handle and resolved handle
+        setCached(sanitizedHandle, coll);
+        if (coll?.handle && coll.handle !== sanitizedHandle) {
+          setCached(coll.handle, coll);
+        }
+        return coll;
       } catch (error) {
         if (error instanceof Error) {
           console.error(

@@ -98,6 +98,15 @@ class ShopClient {
 - Store information retrieval
 - Error boundary management
 
+#### Caching Strategy
+
+- Purpose: reduce redundant network calls for relatively static store metadata.
+- Scope: `getInfo()` caches the latest successful result and timestamp per `ShopClient` instance.
+- TTL: configurable via constructor option `cacheTTL` (milliseconds). Defaults to 5 minutes unless overridden.
+- In-flight deduplication: concurrent `getInfo()` calls share the same ongoing request to avoid bursts.
+- Manual invalidation: `clearInfoCache()` resets the cached value and timestamp, forcing a refetch on next `getInfo()`.
+- Instance isolation: cache is stored on the `ShopClient` instance; separate instances have independent caches.
+
 ### Utilities
 
 Shared utility functions support consistent normalization and parsing across modules:

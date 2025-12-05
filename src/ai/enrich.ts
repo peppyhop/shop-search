@@ -49,7 +49,7 @@ export async function fetchAjaxProduct(
 ): Promise<ShopifySingleProduct> {
   const base = normalizeDomainToBase(domain);
   const url = `${base}/products/${handle}.js`;
-  const res = await rateLimitedFetch(url);
+  const res = await rateLimitedFetch(url, { rateLimitClass: "products:ajax" });
   if (!res.ok) throw new Error(`Failed to fetch AJAX product: ${url}`);
   const data: ShopifySingleProduct = await res.json();
   return data;
@@ -64,7 +64,7 @@ export async function fetchProductPage(
 ): Promise<string> {
   const base = normalizeDomainToBase(domain);
   const url = `${base}/products/${handle}`;
-  const res = await rateLimitedFetch(url);
+  const res = await rateLimitedFetch(url, { rateLimitClass: "products:html" });
   if (!res.ok) throw new Error(`Failed to fetch product page: ${url}`);
   return res.text();
 }
@@ -399,6 +399,7 @@ async function callOpenRouter(
           headers,
           body: JSON.stringify(buildPayload(m)),
           signal: controller.signal,
+          rateLimitClass: "ai:openrouter",
         });
         clearTimeout(timeout);
         if (!response.ok) {

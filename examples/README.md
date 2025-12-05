@@ -127,6 +127,28 @@ const { fetchProducts } = require('shop-client/products');
 
 The library declares `sideEffects: false` and uses a lazily-started rate limiter timer, improving tree-shakeability.
 
+### Caching
+
+Control and manually manage store info caching:
+
+```typescript
+import { ShopClient } from 'shop-client';
+
+// Set a custom TTL (e.g., 60 seconds)
+const shop = new ShopClient('https://anuki.in', { cacheTTL: 60_000 });
+
+// First call caches the result
+const info1 = await shop.getInfo();
+
+// Force a refetch even within TTL
+shop.clearInfoCache();
+const info2 = await shop.getInfo();
+```
+
+Notes:
+- Cache is per `ShopClient` instance.
+- Concurrent `getInfo()` calls are deduplicated while a request is in-flight.
+
 ## 📊 Expected Output
 
 ### Basic Example Output

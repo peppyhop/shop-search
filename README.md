@@ -6,6 +6,18 @@
 
 `shop-client` is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.
 
+## Contents
+
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Store Info Caching & Concurrency](#store-info-caching--concurrency)
+- [Browser Usage](#browser-usage)
+- [Server/Edge Usage](#serveredge-usage)
+- [Deep Imports & Tree-Shaking](#deep-imports--tree-shaking)
+- [Rate Limiting](#rate-limiting)
+- [Migration: Barrel → Subpath Imports](#migration-barrel--subpath-imports)
+ - [API Docs](#api-docs)
+
 ## 🚀 Features
 
 - **Complete Store Data Access**: Fetch products, collections, and store information
@@ -16,6 +28,66 @@
 - **Performance Optimized**: Efficient data fetching with built-in error handling
 - **Zero Dependencies**: Lightweight with minimal external dependencies
 - **Store Type Classification**: Infers audience and verticals from showcased products (body_html-only)
+
+## 🧠 Store Info Caching & Concurrency
+
+`getInfo()` uses time-based caching and in-flight request deduping to avoid redundant network calls:
+
+- Cache window: `5 minutes` (`cacheExpiry`). Fresh cached results return immediately.
+  - You can configure this TTL via the `ShopClient` constructor option `cacheTTL` (milliseconds).
+- Cached fields: `infoCacheValue` (last `StoreInfo`) and `infoCacheTimestamp` (last fetch time).
+- In-flight deduping: concurrent calls share a single request via an internal promise; result is cached and returned to all callers.
+- Failure handling: the in-flight marker clears in a `finally` block so subsequent calls can retry.
+
+Behavior:
+- Cached and fresh → returns cached `StoreInfo`.
+- Stale/missing and request in-flight → awaits shared promise.
+- Stale/missing and no in-flight → performs fetch, caches, returns.
+
+Example: configure cache TTL
+
+```ts
+import { ShopClient } from "shop-client";
+
+// Set store info + validation cache TTL to 10 seconds
+const shop = new ShopClient("https://exampleshop.com", { cacheTTL: 10_000 });
+const info = await shop.getInfo();
+```
+
+Manual invalidation
+
+```ts
+import { ShopClient } from "shop-client";
+
+const shop = new ShopClient("https://exampleshop.com", { cacheTTL: 60_000 });
+
+// Fetch and cache
+await shop.getInfo();
+
+// Invalidate cache proactively (e.g., after a content update)
+shop.clearInfoCache();
+
+// Next call refetches and repopulates cache
+await shop.getInfo();
+```
+
+Force refetch
+
+```ts
+import { ShopClient } from "shop-client";
+
+const shop = new ShopClient("https://exampleshop.com", { cacheTTL: 60_000 });
+
+// First call caches within TTL
+await shop.getInfo();
+
+// Force a fresh network fetch even if the cache is still fresh
+const fresh = await shop.getInfo({ force: true });
+```
+
+See also:
+- Architecture: [Caching Strategy](./ARCHITECTURE.md#caching-strategy)
+- API Reference (LLM): [ShopClientOptions, getInfo(force), clearInfoCache](./.llm/api-reference.md#constructor)
 
 ## 📦 Installation
 
@@ -180,7 +252,12 @@ Notes:
 - No bundler changes required; deep imports are exposed via `exports`.
 - The root entry continues to work; prefer deep imports for production apps.
 
-## ��️ Rate Limiting
+## API Docs
+
+- TypeDoc builds automatically on pushes to `main` and publishes to GitHub Pages.
+- Visit: `https://peppyhop.github.io/shop-client/` (after the first successful workflow run).
+
+## Rate Limiting
 
 `shop-client` ships with an opt-in, global rate limiter that transparently throttles all internal HTTP requests (products, collections, store info, enrichment). This helps avoid `429 Too Many Requests` responses and keeps crawling stable.
 

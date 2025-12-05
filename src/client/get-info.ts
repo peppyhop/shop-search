@@ -35,7 +35,9 @@ export async function getInfoForStore(
     validateLinksInBatches,
   } = args;
 
-  const response = await rateLimitedFetch(baseUrl);
+  const response = await rateLimitedFetch(baseUrl, {
+    rateLimitClass: "store:info",
+  });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }

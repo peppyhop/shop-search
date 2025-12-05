@@ -89,6 +89,18 @@ export function createProductOperations(
   findProduct: (handle: string) => Promise<Product | null>
 ): ProductOperations {
   // Use shared formatter from utils
+  const cacheExpiryMs = 5 * 60 * 1000; // 5 minutes
+  const findCache = new Map<string, { ts: number; value: Product | null }>();
+  const getCached = (key: string): Product | null | undefined => {
+    const entry = findCache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.ts < cacheExpiryMs) return entry.value;
+    findCache.delete(key);
+    return undefined;
+  };
+  const setCached = (key: string, value: Product | null) => {
+    findCache.set(key, { ts: Date.now(), value });
+  };
 
   function applyCurrencyOverride(
     product: Product,
@@ -204,7 +216,9 @@ export function createProductOperations(
       const url = `${baseUrl}products.json?limit=${limit}&page=${page}`;
 
       try {
-        const response = await rateLimitedFetch(url);
+        const response = await rateLimitedFetch(url, {
+          rateLimitClass: "products:paginated",
+        });
         if (!response.ok) {
           console.error(
             `HTTP error! status: ${response.status} for ${storeDomain} page ${page}`
@@ -286,11 +300,22 @@ export function createProductOperations(
           throw new Error("Product handle is too long");
         }
 
+        // Return cached value if present
+        const cached = getCached(sanitizedHandle);
+        if (typeof cached !== "undefined") {
+          return options?.currency
+            ? cached
+              ? applyCurrencyOverride(cached, options.currency!)
+              : null
+            : cached;
+        }
+
         // Resolve canonical handle via HTML redirect if handle has changed
         let finalHandle = sanitizedHandle;
         try {
           const htmlResp = await rateLimitedFetch(
-            `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}`
+            `${baseUrl}products/${encodeURIComponent(sanitizedHandle)}`,
+            { rateLimitClass: "products:resolve" }
           );
           if (htmlResp.ok) {
             const finalUrl = htmlResp.url;
@@ -309,7 +334,9 @@ export function createProductOperations(
         }
 
         const url = `${baseUrl}products/${encodeURIComponent(finalHandle)}.js${qs ? `?${qs}` : ""}`;
-        const response = await rateLimitedFetch(url);
+        const response = await rateLimitedFetch(url, {
+          rateLimitClass: "products:single",
+        });
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -320,6 +347,10 @@ export function createProductOperations(
 
         const product = (await response.json()) as ShopifySingleProduct;
         const productData = productDto(product);
+        // Cache under both original sanitized handle and final handle
+        setCached(sanitizedHandle, productData);
+        if (finalHandle !== sanitizedHandle)
+          setCached(finalHandle, productData);
         return options?.currency
           ? applyCurrencyOverride(productData, options.currency)
           : productData;

@@ -28,6 +28,11 @@ The main orchestrator class that provides a unified interface to all library fun
 - Lazy-loads operation modules for better performance
 - Provides consistent error handling across all operations
 
+**Caching & Concurrency:**
+- `getInfo()` results are cached per instance with a configurable TTL via `ShopClientOptions.cacheTTL`.
+- Concurrent `getInfo()` calls deduplicate by sharing the same in-flight request.
+- Manual invalidation is available with `shop.clearInfoCache()`.
+
 **Store Type Classification:**
 - Method: `determineStoreType(options?)`
 - Classifies showcased products using only `product.bodyHtml` (no images or external text).
