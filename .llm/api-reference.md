@@ -600,12 +600,16 @@ Utility functions are exported to support common normalization and parsing tasks
 import { sanitizeDomain } from 'shop-search';
 sanitizeDomain('https://WWW.Example.com/path?x=1#top'); // 'example.com'
 sanitizeDomain('www.example.com', { stripWWW: false }); // 'www.example.com'
+// sanitizeDomain('example'); // throws (invalid: missing public suffix)
 ```
 
 Normalizes domains by:
 - Lowercasing
 - Stripping protocol, path, query, fragment, and ports
 - Stripping `www.` by default (configurable via `stripWWW`)
+Throws for invalid inputs:
+- Empty strings or whitespace-only
+- Hostnames missing a public suffix (e.g., 'example')
 
 ### safeParseDate(input?)
 

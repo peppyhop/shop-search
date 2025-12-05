@@ -219,9 +219,14 @@ describe("Utility Functions", () => {
     });
 
     test("throws for empty input", () => {
-      expect(() => sanitizeDomain("")).toThrow();
+      expect(() => sanitizeDomain("" )) .toThrow();
       expect(() => sanitizeDomain("   ")).toThrow();
       expect(() => sanitizeDomain(undefined as any)).toThrow();
+    });
+
+    test("throws for bare hostnames without suffix", () => {
+      expect(() => sanitizeDomain("example")).toThrow();
+      expect(() => sanitizeDomain("www.example", { stripWWW: false })).toThrow();
     });
   });
 
