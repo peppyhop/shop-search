@@ -37,15 +37,22 @@ import { rateLimitedFetch } from "./utils/rate-limit";
  * const storeInfo = await shop.getInfo();
  * ```
  */
+export type ShopClientOptions = {
+  cacheTTL?: number; // milliseconds for validation + info cache entries
+};
+
 export class ShopClient {
   private storeDomain: string;
   private baseUrl: string;
   private storeSlug: string;
-  private validationCache: Map<string, boolean> = new Map(); // Simple cache for validation results
-  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes cache expiry
+  private validationCache: Map<string, boolean> = new Map();
+  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes
   private cacheTimestamps: Map<string, number> = new Map();
   private normalizeImageUrlCache: Map<string, string> = new Map();
   private storeCurrency?: string;
+  private infoCacheValue?: StoreInfo;
+  private infoCacheTimestamp?: number;
+  private infoInFlight?: Promise<StoreInfo>;
 
   // Public operations interfaces
   public products: ProductOperations;
@@ -73,7 +80,7 @@ export class ShopClient {
    * const shop2 = new ShopClient('https://boutique.fashion');
    * ```
    */
-  constructor(urlPath: string) {
+  constructor(urlPath: string, options?: ShopClientOptions) {
     // Validate input URL
     if (!urlPath || typeof urlPath !== "string") {
       throw new Error("Store URL is required and must be a string");
@@ -137,6 +144,11 @@ export class ShopClient {
 
     // Pre-calculate store slug once
     this.storeSlug = generateStoreSlug(this.storeDomain);
+
+    // Apply configuration
+    if (typeof options?.cacheTTL === "number" && options.cacheTTL > 0) {
+      this.cacheExpiry = options.cacheTTL;
+    }
 
     // Initialize operations
     this.storeOperations = createStoreOperations({
@@ -244,10 +256,10 @@ export class ShopClient {
 
     if (error instanceof Error) {
       errorMessage += `: ${error.message}`;
-
-      // Check if it's a fetch error with response
-      if ("status" in error) {
-        statusCode = error.status as number;
+      // Check if it's a fetch error with response-like status
+      const anyErr = error as any;
+      if (anyErr && typeof anyErr.status === "number") {
+        statusCode = anyErr.status as number;
       }
     } else if (typeof error === "string") {
       errorMessage += `: ${error}`;
@@ -282,7 +294,9 @@ export class ShopClient {
   ): Promise<Product[] | null> {
     try {
       const url = `${this.baseUrl}products.json?page=${page}&limit=${limit}`;
-      const response = await rateLimitedFetch(url);
+      const response = await rateLimitedFetch(url, {
+        rateLimitClass: "products:list",
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -305,7 +319,9 @@ export class ShopClient {
   private async fetchCollections(page: number, limit: number) {
     try {
       const url = `${this.baseUrl}collections.json?page=${page}&limit=${limit}`;
-      const response = await rateLimitedFetch(url);
+      const response = await rateLimitedFetch(url, {
+        rateLimitClass: "collections:list",
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -335,7 +351,8 @@ export class ShopClient {
       let finalHandle = collectionHandle;
       try {
         const htmlResp = await rateLimitedFetch(
-          `${this.baseUrl}collections/${encodeURIComponent(collectionHandle)}`
+          `${this.baseUrl}collections/${encodeURIComponent(collectionHandle)}`,
+          { rateLimitClass: "collections:resolve" }
         );
         if (htmlResp.ok) {
           const finalUrl = htmlResp.url;
@@ -354,7 +371,9 @@ export class ShopClient {
       }
 
       const url = `${this.baseUrl}collections/${finalHandle}/products.json?page=${page}&limit=${limit}`;
-      const response = await rateLimitedFetch(url);
+      const response = await rateLimitedFetch(url, {
+        rateLimitClass: "collections:items",
+      });
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -386,7 +405,10 @@ export class ShopClient {
 
     try {
       const url = `${this.baseUrl}products/${handle}.js`;
-      const response = await rateLimitedFetch(url, { method: "HEAD" });
+      const response = await rateLimitedFetch(url, {
+        method: "HEAD",
+        rateLimitClass: "validate:product",
+      });
       const exists = response.ok;
 
       this.setCacheValue(cacheKey, exists);
@@ -409,7 +431,10 @@ export class ShopClient {
 
     try {
       const url = `${this.baseUrl}collections/${handle}.json`;
-      const response = await rateLimitedFetch(url, { method: "HEAD" });
+      const response = await rateLimitedFetch(url, {
+        method: "HEAD",
+        rateLimitClass: "validate:collection",
+      });
       const exists = response.ok;
 
       this.setCacheValue(cacheKey, exists);
@@ -443,7 +468,7 @@ export class ShopClient {
    */
   private async validateLinksInBatches<T>(
     items: T[],
-    validator: (item: T) => Promise<boolean>,
+    validator: (_item: T) => Promise<boolean>,
     batchSize = 10
   ): Promise<T[]> {
     const validItems: T[] = [];
@@ -501,24 +526,71 @@ export class ShopClient {
    * console.log(storeInfo.country); // "US"
    * ```
    */
-  async getInfo(): Promise<StoreInfo> {
+  /**
+   * Optionally bypass cache and force a fresh fetch.
+   *
+   * @param options - `{ force?: boolean }` when `true`, ignores cached value and TTL.
+   */
+  async getInfo(options?: { force?: boolean }): Promise<StoreInfo> {
     try {
-      const { info, currencyCode } = await getInfoForStore({
-        baseUrl: this.baseUrl,
-        storeDomain: this.storeDomain,
-        validateProductExists: (handle) => this.validateProductExists(handle),
-        validateCollectionExists: (handle) =>
-          this.validateCollectionExists(handle),
-        validateLinksInBatches: (items, validator, batchSize) =>
-          this.validateLinksInBatches(items, validator, batchSize),
-      });
-      if (typeof currencyCode === "string") {
-        this.storeCurrency = currencyCode;
+      // If force is requested, clear local cache to bypass freshness check
+      if (options?.force === true) {
+        this.clearInfoCache();
       }
-      return info;
-    } catch (error) {
-      this.handleFetchError(error, "fetching store info", this.baseUrl);
+      // Return cached info if fresh
+      if (
+        this.infoCacheValue &&
+        this.infoCacheTimestamp !== undefined &&
+        Date.now() - this.infoCacheTimestamp < this.cacheExpiry
+      ) {
+        return this.infoCacheValue;
+      }
+
+      // If a request is already in-flight, reuse it to avoid duplicate network calls
+      if (this.infoInFlight) {
+        return await this.infoInFlight;
+      }
+      // Create a single shared promise for the network request
+      this.infoInFlight = (async () => {
+        const { info, currencyCode } = await getInfoForStore({
+          baseUrl: this.baseUrl,
+          storeDomain: this.storeDomain,
+          validateProductExists: (handle) => this.validateProductExists(handle),
+          validateCollectionExists: (handle) =>
+            this.validateCollectionExists(handle),
+          validateLinksInBatches: (items, validator, batchSize) =>
+            this.validateLinksInBatches(items, validator, batchSize),
+        });
+        if (typeof currencyCode === "string") {
+          this.storeCurrency = currencyCode;
+        }
+        // Cache the info for a short duration
+        this.infoCacheValue = info;
+        this.infoCacheTimestamp = Date.now();
+        return info;
+      })();
+
+      try {
+        const result = await this.infoInFlight;
+        return result;
+      } finally {
+        // Clear in-flight marker once resolved or rejected
+        this.infoInFlight = undefined;
+      }
+    } catch (error: unknown) {
+      throw this.handleFetchError(error, "fetching store info", this.baseUrl);
     }
+  }
+
+  /**
+   * Manually clear the cached store info.
+   * The next call to `getInfo()` will fetch fresh data regardless of TTL.
+   */
+  clearInfoCache(): void {
+    this.infoCacheValue = undefined;
+    this.infoCacheTimestamp = undefined;
+    // Intentionally do not cancel or modify in-flight request.
+    // If a fetch is already in progress, it will populate fresh cache on completion.
   }
 
   /**

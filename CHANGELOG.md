@@ -1,6 +1,15 @@
 <!-- Repository Rename Notice -->
 > As of `v3.8.2`, the package and repository were renamed from `shop-search` to `shop-client`. Links prior to `v3.8.2` reference `peppyhop/shop-search`; links from `v3.8.2` onward reference `peppyhop/shop-client`.
 
+## [Unreleased]
+
+### Features
+
+- Configurable cache TTL for `getInfo()` via `ShopClientOptions.cacheTTL`
+- Manual cache invalidation with `ShopClient.clearInfoCache()`
+- Force refetch with `getInfo({ force: true })` to bypass cache TTL
+
+
 ## [3.8.2](https://github.com/peppyhop/shop-client/compare/v3.8.1...v3.8.2) (2025-12-05)
 
 ### Chores

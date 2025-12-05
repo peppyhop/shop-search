@@ -27,36 +27,77 @@ const shop = new ShopClient('your-store-domain.com');
 ### Constructor
 
 ```typescript
-new ShopClient(domain: string)
+new ShopClient(domain: string, options?: ShopClientOptions)
 ```
 
 **Parameters:**
 - `domain` (string): The Shopify store domain (e.g., 'example.myshopify.com' or 'shop.example.com')
+- `options` (ShopClientOptions, optional): Configuration overrides
+
+```typescript
+type ShopClientOptions = {
+  /** Cache TTL for getInfo() in milliseconds (default ~300_000) */
+  cacheTTL?: number;
+};
+```
 
 **Returns:** ShopClient instance
 
 **Example:**
 ```typescript
 const shop = new ShopClient('anuki.in');
+
+// Customize cache TTL to 60 seconds
+const fastExpiring = new ShopClient('anuki.in', { cacheTTL: 60_000 });
 ```
 
 ### Methods
 
-#### getInfo()
+#### getInfo(options?)
 
 ```typescript
-async getInfo(): Promise<StoreInfo | null>
+async getInfo(options?: { force?: boolean }): Promise<StoreInfo | null>
 ```
 
 Fetches comprehensive store information including metadata, social links, and featured content.
 
+Caching:
+- Results are cached per `ShopClient` instance.
+- TTL is configurable via `ShopClientOptions.cacheTTL`.
+- Concurrent calls are deduplicated while a request is in-flight.
+- `options.force === true` bypasses the cache and triggers a fresh fetch regardless of TTL.
+
+**Parameters:**
+- `options.force` (boolean, optional): When `true`, bypasses cache and refetches.
+
 **Returns:** Promise resolving to StoreInfo object or null if store not found
 
-**Example:**
+**Examples:**
 ```typescript
+// Normal usage
 const storeInfo = await shop.getInfo();
 console.log(storeInfo?.name); // Store name
 console.log(storeInfo?.description); // Store description
+
+// Force refetch within TTL
+await shop.getInfo(); // cached
+const fresh = await shop.getInfo({ force: true }); // refetched
+```
+
+#### clearInfoCache()
+
+```typescript
+clearInfoCache(): void
+```
+
+Manually invalidates the `getInfo()` cache on the current `ShopClient` instance. After calling this, the next `getInfo()` triggers a fresh network request regardless of TTL.
+
+**Example:**
+```typescript
+const shop = new ShopClient('anuki.in', { cacheTTL: 5 * 60_000 });
+await shop.getInfo(); // cached
+shop.clearInfoCache(); // invalidate
+const fresh = await shop.getInfo(); // refetches
 ```
 
 #### determineStoreType(options?)

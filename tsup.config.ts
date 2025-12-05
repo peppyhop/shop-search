@@ -10,6 +10,7 @@ export default defineConfig({
     "src/utils/rate-limit.ts",
   ],
   format: ["esm"],
+  outExtension: () => ({ js: ".mjs" }),
   dts: true,
   sourcemap: false,
   minify: true,

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/products.ts",
+    "src/collections.ts",
+    "src/checkout.ts",
+    "src/store.ts"
+  ],
+  "out": "docs",
+  "plugin": ["typedoc-plugin-markdown"],
+  "theme": "markdown",
+  "tsconfig": "tsconfig.json",
+  "exclude": ["src/__tests__/**", "examples/**", "**/*.test.ts"],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": false,
+  "includeVersion": true,
+  "hideGenerator": true,
+  "readme": "README.md",
+  "indexTitle": "Shop Client API"
+}

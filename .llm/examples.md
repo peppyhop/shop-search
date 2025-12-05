@@ -76,6 +76,32 @@ async function getStoreDetails() {
 getStoreDetails();
 ```
 
+### 2a. Configuring Cache TTL
+
+```typescript
+import { ShopClient } from 'shop-client';
+
+// Cache store info for 1 minute per instance
+const shop = new ShopClient('anuki.in', { cacheTTL: 60_000 });
+
+const info = await shop.getInfo(); // caches
+```
+
+### 2b. Manual Cache Invalidation
+
+```typescript
+// Force a refetch of store info within TTL
+shop.clearInfoCache();
+const fresh = await shop.getInfo();
+```
+
+### 2c. Force Refetch Within TTL
+
+```typescript
+// Bypass cache without manual invalidation
+const freshInfo = await shop.getInfo({ force: true });
+```
+
 ### 3. Product Search and Filtering
 
 ```typescript

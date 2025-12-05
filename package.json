@@ -27,8 +27,8 @@
       "types": "./dist/store.d.ts"
     },
     "./rate-limit": {
-      "import": "./dist/rate-limit.mjs",
-      "types": "./dist/rate-limit.d.ts"
+      "import": "./dist/utils/rate-limit.mjs",
+      "types": "./dist/utils/rate-limit.d.ts"
     }
   },
   "sideEffects": false,
@@ -45,6 +45,7 @@
     "dev": "tsup --watch",
     "test": "bun test",
     "test:ci": "bun test --coverage",
+    "docs:build": "typedoc",
     "semantic-release": "semantic-release",
     "format": "biome format --write --no-errors-on-unmatched",
     "lint": "biome lint --diagnostic-level=error --no-errors-on-unmatched . && tsc --noEmit -p tsconfig.json",
@@ -87,6 +88,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "semantic-release": "^25.0.2",
+    "typedoc": "^0.25.7",
+    "typedoc-plugin-markdown": "^4.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
