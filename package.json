@@ -88,8 +88,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "semantic-release": "^25.0.2",
-    "typedoc": "^0.25.7",
-    "typedoc-plugin-markdown": "^4.0.0",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.9.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
