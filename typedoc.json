@@ -18,5 +18,5 @@
   "includeVersion": true,
   "hideGenerator": true,
   "readme": "README.md",
-  "indexTitle": "Shop Client API"
+  "indexFormat": "Table"
 }
