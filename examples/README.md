@@ -1,6 +1,6 @@
 # Shop Search Examples
 
-This folder contains example implementations demonstrating how to use the `shop-search` library with real-world scenarios using the `anuki.in` domain.
+This folder contains example implementations demonstrating how to use the `shop-client` library with real-world scenarios using the `anuki.in` domain.
 
 ## 📁 Examples Overview
 
@@ -36,10 +36,10 @@ A comprehensive example showcasing advanced features:
 ## 🚀 Running the Examples
 
 ### Prerequisites
-Make sure you have the shop-search library installed:
+Make sure you have the shop-client library installed:
 
 ```bash
-npm install shop-search
+npm install shop-client
 ```
 
 ### Running Basic Example
@@ -52,19 +52,19 @@ npx ts-node examples/basic-usage.ts
 npx ts-node examples/advanced-usage.ts
 
 ### Browser Example (CDN ESM)
-If you want to run `shop-search` directly in the browser without a bundler, use a CDN that serves ESM with the correct JavaScript MIME type:
+If you want to run `shop-client` directly in the browser without a bundler, use a CDN that serves ESM with the correct JavaScript MIME type:
 
 ```html
 <script type="importmap">
 {
   "imports": {
-    "shop-search": "https://cdn.jsdelivr.net/npm/shop-search/+esm"
+    "shop-client": "https://cdn.jsdelivr.net/npm/shop-client/+esm"
   }
 }
 </script>
 
 <script type="module">
-  import { ShopClient } from 'shop-search';
+  import { ShopClient } from 'shop-client';
   const shop = new ShopClient('https://anuki.in');
   console.log(await shop.getInfo());
   console.log(await shop.products.paginated({ page: 1, limit: 12 }));
@@ -73,8 +73,8 @@ If you want to run `shop-search` directly in the browser without a bundler, use 
 ```
 
 Alternative CDNs:
-- `https://esm.sh/shop-search@3.5.0`
-- `https://unpkg.com/shop-search@3.5.0?module`
+- `https://esm.sh/shop-client@3.5.0`
+- `https://unpkg.com/shop-client@3.5.0?module`
 
 Troubleshooting:
 - Ensure the CDN returns `Content-Type: application/javascript`. The `+esm`/`?module` hints enforce ESM delivery.
@@ -117,12 +117,12 @@ Examples can deep import modules to reduce bundle size and speed up builds:
 
 ```typescript
 // ESM
-import { configureRateLimit } from 'shop-search/rate-limit';
-import { fetchProducts } from 'shop-search/products';
+import { configureRateLimit } from 'shop-client/rate-limit';
+import { fetchProducts } from 'shop-client/products';
 
 // CommonJS
-const { configureRateLimit } = require('shop-search/rate-limit');
-const { fetchProducts } = require('shop-search/products');
+const { configureRateLimit } = require('shop-client/rate-limit');
+const { fetchProducts } = require('shop-client/products');
 ```
 
 The library declares `sideEffects: false` and uses a lazily-started rate limiter timer, improving tree-shakeability.

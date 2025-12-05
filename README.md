@@ -1,10 +1,10 @@
 # Shop Search
 
-[![npm version](https://badge.fury.io/js/shop-search.svg)](https://badge.fury.io/js/shop-search)
+[![npm version](https://badge.fury.io/js/shop-client.svg)](https://badge.fury.io/js/shop-client)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`shop-search` is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.
+`shop-client` is a powerful, type-safe TypeScript library for fetching and transforming product data from Shopify stores. Perfect for building e-commerce applications, product catalogs, price comparison tools, and automated store analysis.
 
 ## 🚀 Features
 
@@ -20,21 +20,21 @@
 ## 📦 Installation
 
 ```bash
-npm install shop-search
+npm install shop-client
 ```
 
 ```bash
-yarn add shop-search
+yarn add shop-client
 ```
 
 ```bash
-pnpm add shop-search
+pnpm add shop-client
 ```
 
 ## 🔧 Quick Start
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 // Initialize shop client instance
 const shop = new ShopClient("your-store-domain.com");
@@ -51,20 +51,20 @@ const product = await shop.products.find("product-handle");
 
 ## Browser Usage
 
-Some in-browser environments load npm packages via blob URLs and can error if the content is not served with a JavaScript MIME type (e.g., “Modules must be served with a valid MIME type like application/javascript”). To use `shop-search` directly in the browser, import the ESM build from a CDN that sets the correct `Content-Type`:
+Some in-browser environments load npm packages via blob URLs and can error if the content is not served with a JavaScript MIME type (e.g., “Modules must be served with a valid MIME type like application/javascript”). To use `shop-client` directly in the browser, import the ESM build from a CDN that sets the correct `Content-Type`:
 
 ```html
-<!-- Import map to pin shop-search to a CDN ESM URL -->
+<!-- Import map to pin shop-client to a CDN ESM URL -->
 <script type="importmap">
 {
   "imports": {
-    "shop-search": "https://cdn.jsdelivr.net/npm/shop-search/+esm"
+    "shop-client": "https://cdn.jsdelivr.net/npm/shop-client/+esm"
   }
 }
 </script>
 
 <script type="module">
-  import { ShopClient } from 'shop-search';
+  import { ShopClient } from 'shop-client';
   const shop = new ShopClient('https://example.myshopify.com/');
   const info = await shop.getInfo();
   console.log(info);
@@ -77,21 +77,21 @@ Some in-browser environments load npm packages via blob URLs and can error if th
 ```
 
 Alternative CDN URLs:
-- `https://esm.sh/shop-search@3.5.0`
-- `https://unpkg.com/shop-search@3.5.0?module`
+- `https://esm.sh/shop-client@3.5.0`
+- `https://unpkg.com/shop-client@3.5.0?module`
 
 Troubleshooting:
 - Ensure the CDN returns `Content-Type: application/javascript`. The `+esm` and `?module` suffixes enforce ESM delivery.
 - If you build your own blob, set `new Blob(code, { type: 'text/javascript' })` before `import()`.
-- For app frameworks (Vite, Next.js), import `shop-search` normally and let the bundler serve modules.
+- For app frameworks (Vite, Next.js), import `shop-client` normally and let the bundler serve modules.
 
 ## Server/Edge Usage
 
-For robust production setups, run `shop-search` on the server or an edge function and return JSON to the browser:
+For robust production setups, run `shop-client` on the server or an edge function and return JSON to the browser:
 
 ```ts
 // /api/shop-info.ts (Edge/Node)
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 export default async function handler(req, res) {
   const shop = new ShopClient('https://example.myshopify.com/');
@@ -114,16 +114,16 @@ Examples:
 
 ```typescript
 // ESM deep imports
-import { configureRateLimit } from 'shop-search/rate-limit';
-import { ProductOperations } from 'shop-search/products';
+import { configureRateLimit } from 'shop-client/rate-limit';
+import { ProductOperations } from 'shop-client/products';
 
 // CommonJS deep imports
-const { configureRateLimit } = require('shop-search/rate-limit');
-const { ProductOperations } = require('shop-search/products');
+const { configureRateLimit } = require('shop-client/rate-limit');
+const { ProductOperations } = require('shop-client/products');
 
 // Recommended: import specific functions you use
-import { ShopClient } from 'shop-search';
-import { fetchProducts } from 'shop-search/products';
+import { ShopClient } from 'shop-client';
+import { fetchProducts } from 'shop-client/products';
 ```
 
 Notes:
@@ -133,32 +133,32 @@ Notes:
 
 ### Migration: Barrel → Subpath Imports
 
-You can keep using the root entry (`shop-search`), but for smaller bundles switch to deep imports. The API remains the same—only the import paths change.
+You can keep using the root entry (`shop-client`), but for smaller bundles switch to deep imports. The API remains the same—only the import paths change.
 
 Examples:
 
 ```typescript
 // Before (barrel import)
-import { ShopClient, configureRateLimit } from 'shop-search';
+import { ShopClient, configureRateLimit } from 'shop-client';
 
 // After (deep imports for better tree-shaking)
-import { ShopClient } from 'shop-search';
-import { configureRateLimit } from 'shop-search/rate-limit';
+import { ShopClient } from 'shop-client';
+import { configureRateLimit } from 'shop-client/rate-limit';
 
 // Feature-specific imports
-import { fetchProducts } from 'shop-search/products';
-import { createCheckoutOperations } from 'shop-search/checkout';
+import { fetchProducts } from 'shop-client/products';
+import { createCheckoutOperations } from 'shop-client/checkout';
 ```
 
 CommonJS:
 
 ```javascript
 // Before
-const { ShopClient, configureRateLimit } = require('shop-search');
+const { ShopClient, configureRateLimit } = require('shop-client');
 
 // After
-const { ShopClient } = require('shop-search');
-const { configureRateLimit } = require('shop-search/rate-limit');
+const { ShopClient } = require('shop-client');
+const { configureRateLimit } = require('shop-client/rate-limit');
 ```
 
 Notes:
@@ -167,14 +167,14 @@ Notes:
 
 ## ��️ Rate Limiting
 
-`shop-search` ships with an opt-in, global rate limiter that transparently throttles all internal HTTP requests (products, collections, store info, enrichment). This helps avoid `429 Too Many Requests` responses and keeps crawling stable.
+`shop-client` ships with an opt-in, global rate limiter that transparently throttles all internal HTTP requests (products, collections, store info, enrichment). This helps avoid `429 Too Many Requests` responses and keeps crawling stable.
 
 - Default: disabled
 - When enabled: defaults to `5` requests per `1000ms` with max concurrency `5`
 - Configure globally via `configureRateLimit`
 
 ```typescript
-import { ShopClient, configureRateLimit } from 'shop-search';
+import { ShopClient, configureRateLimit } from 'shop-client';
 
 // Enable and configure the global rate limiter
 configureRateLimit({
@@ -200,7 +200,7 @@ Notes:
 You can set different buckets by host (including wildcards) or by logical class:
 
 ```typescript
-import { configureRateLimit } from 'shop-search';
+import { configureRateLimit } from 'shop-client';
 
 configureRateLimit({
   enabled: true,
@@ -235,7 +235,7 @@ Resolution order:
 Tip: You can deep import the limiter configuration surface:
 
 ```typescript
-import { configureRateLimit } from 'shop-search/rate-limit';
+import { configureRateLimit } from 'shop-client/rate-limit';
 ```
 
 ## 📚 API Reference
@@ -498,7 +498,7 @@ const checkoutUrl = shop.checkout.createUrl({
 Helper utilities exported for common normalization and parsing tasks.
 
 ```typescript
-import { sanitizeDomain, safeParseDate } from 'shop-search';
+import { sanitizeDomain, safeParseDate } from 'shop-client';
 
 // Normalize domains safely
 sanitizeDomain('https://www.example.com');            // "example.com"
@@ -535,7 +535,7 @@ Notes:
 Determine the store’s primary verticals and target audiences using showcased products. Classification uses only each product’s `body_html` content and aggregates per-product results, optionally pruned by store-level signals.
 
 ```typescript
-import { ShopClient } from 'shop-search';
+import { ShopClient } from 'shop-client';
 
 const shop = new ShopClient('your-store-domain.com');
 
