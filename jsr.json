@@ -1,0 +1,13 @@
+{
+  "name": "@peppyhop/shop-client",
+  "version": "3.9.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./products": "./src/products.ts",
+    "./collections": "./src/collections.ts",
+    "./checkout": "./src/checkout.ts",
+    "./store": "./src/store.ts",
+    "./rate-limit": "./src/utils/rate-limit.ts"
+  }
+}
